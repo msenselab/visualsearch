@@ -1,4 +1,4 @@
-function visualSearchModel1()
+function visualSearchModel_v1()
 
 Ns    = [8 12 16];  % Set sizes
 leaks = [0 1];      % Memory leak (0: static task; 1: dynamic task)
