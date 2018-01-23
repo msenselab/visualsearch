@@ -1,0 +1,28 @@
+\documentclass[12pt]{article}
+\usepackage{color,graphicx,amsmath,authblk, gensymb}
+\usepackage[a4paper]{geometry}
+
+\begin{document}
+\title{A simplified model for the observation of and response to visual stimuli}
+\author{Berk Gercek, Luigi Acerbi, Reidar Riveland}
+\maketitle
+\section{Task Structure}
+We are given a behavioral task in which subjects are presented with one of two stimuli; A dynamic stimuli in which a field of L-shaped distractors are rearranged every 100ms, and potentially contain a T-shaped target (All stimuli can be rotated in 90\degree \ increments) or a static task in which the positions of the distractors and target are fixed.
+
+The targets must respond regarding the presence or absence of a target in order to receive a reward for correctly identifying the state. In this model we will only address the dynamic task.
+
+\section{Generative Model}
+We presume that the underlying state of the system can be one of two states: Target Present or Target Absent. From this state $S$ we model the observer's samples from the system as noisy observations at each time step $x_t$ drawn from a gaussian.
+
+\begin{align*}
+S &\in {0, 1} \\
+P(x_t | S) &= \mathcal{N}(x_t | \mu_s, \sigma^2)\\
+\end{align*} 
+
+From which we can obtain a MAP estimate for the state of the system
+
+\begin{align}
+P(S | x_{1 \dots t}) = \prod_1^t \mathcal{N}(x_t | \mu_s, \sigma^2)
+\end{align}
+
+\end{document}
