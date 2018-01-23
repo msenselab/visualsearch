@@ -3,7 +3,7 @@
 \usepackage[a4paper]{geometry}
 
 \begin{document}
-\title{A simplified model for the observation of and response to visual stimuli}
+\title{A simplified model for the observing and responding to visual stimuli}
 \author{Berk Gercek, Luigi Acerbi, Reidar Riveland}
 \maketitle
 \section{Task Structure}
@@ -25,4 +25,17 @@ From which we can obtain a MAP estimate for the state of the system
 P(S | x_{1 \dots t}) = \prod_1^t \mathcal{N}(x_t | \mu_s, \sigma^2)
 \end{align}
 
+\section{Decision Values}
+We suppose that the observer must at each time step $t$ decide whether or not to respond regarding the state of the system. This decision is influenced by the reward given for each possible pair of decision $i$ and underlying state $j$, which we define as $R_{ij}$. We can formalize the values surrounding this decision as
+
+\begin{align}
+V_t = max
+\begin{cases}
+wait, & \langle V_{t+1} \rangle -\rho\\
+r=1, & P(S=1 | x_{1 \dots t})R_{11} + P(S=0|x_{1 \dots t})R_{10}\\
+r=0, & P(S=0 | x_{1 \dots t})R_{00} + P(S=1 | x_{1 \dots t})R_{01}\\
+\end{cases}
+\end{align}
+
+In which $\rho$ is the reward rate, and $\langle V_{t+1} \rangle$ is the expected value of the system at the next time step.  
 \end{document}
