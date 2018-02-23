@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sbn
 import pickle
 import itertools as it
-from multiprocessing import pool
+from matplotlib.animation import FuncAnimation
 
 T = 30
 t_w = 0.5
@@ -22,7 +22,7 @@ dt = 0.005
 sigma_z = 15
 sigma_x = 4
 mean_z = 0
-rho = 0
+rho = 0.1
 c = 0
 
 
@@ -62,7 +62,7 @@ def V(t, r, V_next_exp):
     return np.max((V_d(r), V_next_exp - (c + rho) * t_w))
 
 
-size = 100
+size = 30
 r_range = np.linspace(-10, 10, size)
 r_grid_base = r_range * np.ones((size, size))
 base_1 = r_grid_base.reshape(size, size, 1)
@@ -79,7 +79,7 @@ for index in range(2, int(T / dt) + 1):
     tau = index * dt
     t = T - tau
     print(index)
-    for i, j in it.product(range(100), range(100)):
+    for i, j in it.product(range(size), range(size)):
         r = r_grid[i, j, :]
         V_d_r = V_d(r)
         transition_probs = np.zeros_like(V_init)
@@ -87,6 +87,22 @@ for index in range(2, int(T / dt) + 1):
                                     z_next_prior(r[0], r_range, sigma_z))
         weighted_vals = V_cube[:, :, -(index - 1)] * transition_probs
         V_cube[i, j, -index] = np.max((np.mean(weighted_vals), V_d_r))
-        decision_cube[i, j, -index] = np.argmax((np.mean(weighted_vals), V_d_r))
+        decision_cube[i, j, -
+                      index] = np.argmax((np.mean(weighted_vals), V_d_r))
         if decision_cube[i, j, -index] == 1:
             decision_cube[i, j, -index] = np.argmax(r) + 1
+
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+
+
+def anim_update(i):
+    ax.clear()
+    ax.pcolor(V_cube[:, :, i])
+    plt.draw()
+    return
+
+
+anim = FuncAnimation(fig, anim_update, frames=int(T / dt))
+anim.save('reward_task_value_evolution.mp4')
