@@ -9,21 +9,19 @@ Tajima et. al. 2016
 
 from __future__ import division
 import numpy as np
-import numpy.linalg as la
 import matplotlib.pyplot as plt
 import seaborn as sbn
-import pickle
 import itertools as it
 from matplotlib.animation import FuncAnimation
 
-T = 30
+T = 3
 t_w = 0.5
 dt = 0.005
 sigma_z = 15
 sigma_x = 4
 mean_z = 0
-rho = 0.1
-c = 0
+rho = 5
+c = 8
 
 
 def sigma_t(t, sigma, sigma_z):
@@ -57,52 +55,53 @@ def V_d(r):
     return np.max(r) - rho * t_w
 
 
-def V(t, r, V_next_exp):
+def V(r, V_next_exp):
     '''Needs to be passed the future value of V'''
     return np.max((V_d(r), V_next_exp - (c + rho) * t_w))
 
 
-size = 30
-r_range = np.linspace(-10, 10, size)
-r_grid_base = r_range * np.ones((size, size))
-base_1 = r_grid_base.reshape(size, size, 1)
-base_2 = r_grid_base.T.reshape(size, size, 1)
-r_grid = np.concatenate((r_grid_base.reshape(size, size, 1), r_grid_base.T.reshape(size, size, 1)),
-                        axis=2)
-V_init = np.max(r_grid, axis=2) - rho * t_w
+if __name__ == '__main__':
+    size = 40
+    r_range = np.linspace(-10, 10, size)
+    r_grid_base = r_range * np.ones((size, size))
+    base_1 = r_grid_base.reshape(size, size, 1)
+    base_2 = r_grid_base.T.reshape(size, size, 1)
+    r_grid = np.concatenate((r_grid_base.reshape(size, size, 1),
+                             r_grid_base.T.reshape(size, size, 1)),
+                            axis=2)
+    V_init = np.max(r_grid, axis=2) - rho * t_w
 
-V_cube = np.zeros((size, size, int(T / dt)))
-V_cube[:, :, -1] = V_init
-decision_cube = np.ones_like(V_cube)
-decision_cube[:, :, -1] = np.argmax(r_grid, axis=2)
-for index in range(2, int(T / dt) + 1):
-    tau = index * dt
-    t = T - tau
-    print(index)
-    for i, j in it.product(range(size), range(size)):
-        r = r_grid[i, j, :]
-        V_d_r = V_d(r)
-        transition_probs = np.zeros_like(V_init)
-        transition_probs = np.outer(z_next_prior(r[1], r_range, sigma_z),
-                                    z_next_prior(r[0], r_range, sigma_z))
-        weighted_vals = V_cube[:, :, -(index - 1)] * transition_probs
-        V_cube[i, j, -index] = np.max((np.mean(weighted_vals), V_d_r))
-        decision_cube[i, j, -
-                      index] = np.argmax((np.mean(weighted_vals), V_d_r))
-        if decision_cube[i, j, -index] == 1:
-            decision_cube[i, j, -index] = np.argmax(r) + 1
+    V_cube = np.zeros((size, size, int(T / dt)))
+    V_cube[:, :, -1] = V_init
+    decision_cube = np.ones_like(V_cube)
+    decision_cube[:, :, -1] = np.argmax(r_grid, axis=2)
+    for index in range(2, int(T / dt) + 1):
+        tau = index * dt
+        t = T - tau
+        print(index)
+        sig_t = sigma_t(t, sigma_x, sigma_z)
+        maxes = np.zeros((size, size))
+        for i, j in it.product(range(size), range(size)):
+            r = r_grid[i, j, :]
+            V_d_r = V_d(r)
+            transition_probs = np.zeros_like(V_init)
+            transition_probs = np.outer(z_next_prior(r[1], r_range, sig_t),
+                                        z_next_prior(r[0], r_range, sig_t))
+            weighted_vals = V_cube[:, :, -(index - 1)] * transition_probs
+            V_cube[i, j, -index] = np.max((np.mean(weighted_vals) - (c + rho) * t_w, V_d_r))
+            decision_cube[i, j, -
+                          index] = np.argmax((np.mean(weighted_vals) - (c + rho) * t_w, V_d_r))
+            if decision_cube[i, j, -index] == 1:
+                decision_cube[i, j, -index] = np.argmax(r) + 1
 
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
+    def anim_update(i):
+        ax.clear()
+        ax.pcolor(decision_cube[:, :, 2 * i])
+        plt.draw()
+        return
 
-
-def anim_update(i):
-    ax.clear()
-    ax.pcolor(V_cube[:, :, i])
-    plt.draw()
-    return
-
-
-anim = FuncAnimation(fig, anim_update, frames=int(T / dt))
-anim.save('reward_task_value_evolution.mp4')
+    anim = FuncAnimation(fig, anim_update, frames=int(T / dt / 2))
+    anim.save('reward_task_value_evolution.mp4', fps=60)
