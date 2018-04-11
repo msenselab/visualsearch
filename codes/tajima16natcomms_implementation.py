@@ -20,8 +20,8 @@ dt = 0.005
 sigma_z = 10
 sigma_x = 4
 mean_z = 0
-rho = 5
-c = 8
+rho = 3
+c = 5
 
 
 def sigma_t(t, sigma, sigma_z):
