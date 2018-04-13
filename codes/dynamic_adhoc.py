@@ -8,16 +8,14 @@ visual search task
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq
-import multiprocessing as mulpro
-import itertools as it
 import seaborn as sbn
 
 T = 6
 t_w = 0.5
-dt = 0.005
+dt = 0.050
 size = 100
-sigma = 20
-rho = 0.4
+sigma = 25
+rho = 0.6
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
 
 
@@ -54,12 +52,12 @@ def posterior(x, g_t, C):
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    p_given_true = (g_t * np.exp(- (x - C)**2 / (2 * sigma**4)))
+    p_given_true = (g_t * np.exp(- (x - C)**2 / (2 * sigma**2)))
     if C == 1:
         othmean = 0
     elif C == 0:
         othmean = 1
-    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- (x - othmean)**2 / (2 * sigma**4)))
+    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- (x - othmean)**2 / (2 * sigma**2)))
 
 
 def simulate_observer(arglist):
@@ -68,7 +66,7 @@ def simulate_observer(arglist):
     step = 0
     t = 0
     g_t = np.ones(int(T / dt)) * 0.5
-    while t < T:
+    while t < (T - dt):
         step += 1
         t = step * dt
         x_t = np.random.normal(C, sigma) * dt
@@ -87,7 +85,7 @@ if __name__ == '__main__':
         g_t = g_values[i]
         for j in range(size):
             g_tp1 = g_values[j]
-            rootgrid[i, j] = brentq(lambda x: g_tp1 - f(x, g_t), -2000, 2000)  # Brent's root prodcedure
+            rootgrid[i, j] = brentq(lambda x: g_tp1 - f(x, g_t), -2000, 2000)  # Brent's root proc.
 
     # Define the reward array
     R = np.array([(10, 0),   # (abs/abs,   abs/pres)
@@ -115,9 +113,9 @@ if __name__ == '__main__':
         for i in range(size):
             g_t = g_values[i]  # Pick ith value of g at t
             roots = rootgrid[i, :]  # Slice roots of our given g_t across all g_(t+1)
-            new_g_probs = p_new_ev(roots, g_t)  # Find the likelihood of observing those roots x_(t+1)
+            new_g_probs = p_new_ev(roots, g_t)  # Find the likelihood of observing roots x_(t+1)
             new_g_probs = new_g_probs / np.sum(new_g_probs)  # Normalize
-            V_wait = np.sum(new_g_probs * V_full[:, -(index - 1)]) - rho * t  # Sum and subt. op cost
+            V_wait = np.sum(new_g_probs * V_full[:, -(index - 1)]) - rho * t  # Sum and subt op cost
 
             # Find the maximum value b/w waiting and two decision options. Store value and identity.
             V_full[i, -index] = np.amax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
@@ -133,3 +131,6 @@ if __name__ == '__main__':
     observer_outputs = []
     for C in C_vals:
         observer_outputs.append(simulate_observer([C, decisions]))
+
+    g_grid = np.array([x[2] for x in observer_outputs])
+    response_times = np.array([x[1] for x in observer_outputs])
