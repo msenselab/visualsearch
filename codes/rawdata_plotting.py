@@ -59,7 +59,7 @@ for i, display in enumerate(displays):
 plt.legend()
 plt.savefig(savepath + 'noreward_RT_dists.png', DPI=500)
 
-## Experiment 2: Rewards with no static display density
+# Experiment 2: Rewards with no static display density
 readfile = open(datapath + 'exp2.csv', 'r')
 reader = csv.reader(readfile)
 
@@ -91,7 +91,7 @@ for setsize, display, target, reward_cond in combinations:
     response_times[keytuple] = np.array(set_rts)
 
 # Plot absent reward distributions
-fig, ax = plt.subplots(2, 2, figsize = (11,8.5))
+fig, ax = plt.subplots(2, 2, figsize=(11, 8.5))
 
 for i, display in enumerate(displays):
     for j, target in enumerate(targets):
@@ -107,7 +107,7 @@ plt.legend()
 plt.savefig(savepath + "absreward_RT_dists.png", DPI=500)
 
 # Plot present reward distributions
-fig, ax = plt.subplots(2, 2, figsize = (11,8.5))
+fig, ax = plt.subplots(2, 2, figsize=(11, 8.5))
 
 for i, display in enumerate(displays):
     for j, target in enumerate(targets):
