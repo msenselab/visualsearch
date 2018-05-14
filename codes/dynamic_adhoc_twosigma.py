@@ -1,14 +1,13 @@
 '''
-March 2018
+May 2018
 
-Implementation of the ad-hoc model for the dynamic version of Strongway's
-visual search task
+Ad hoc model with differing sigma for the present and absent cases
 '''
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import brentq
 import seaborn as sbn
+from scipy.optimize import brentq
 
 T = 10
 t_w = 0.5
@@ -21,26 +20,15 @@ def f(x, g_t, sigma):
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    p_given_true = (g_t * np.exp(- (x-1)**2 / (2 * sigma**2)))
-    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- x**2 / (2 * sigma**2)))
-
-
-def df_dx(x, g_t):
-    ''' x_(t + 1) is x
-    derivative of the f() which we seek to use a root-finding
-    procedure on. Not necessary for our current root finding method. left in
-    for posterity
-    '''
-    numerator = (g_t - 1) * g_t * np.exp(x + 0.5)
-    denominator = (np.sqrt(np.e) * (g_t - 1) - g_t * np.exp(x))**2
-    return numerator / denominator
+    p_given_true = (g_t * np.exp(- (x-1)**2 / (2 * sigma[1]**2)))
+    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- x**2 / (2 * sigma[0]**2)))
 
 
 def p_new_ev(x, g_t, sigma):
     ''' The probability of a given observation x_(t+1) given our current belief
     g_t'''
-    p_pres = np.exp(- (x - 1)**2 / (2 * sigma**2)) / np.sqrt(2 * np.pi * sigma**2)
-    p_abs = np.exp(- x**2 / (2 * sigma**2)) / np.sqrt(2 * np.pi * sigma**2)
+    p_pres = np.exp(- (x - 1)**2 / (2 * sigma[1]**2)) / np.sqrt(2 * np.pi * sigma[1]**2)
+    p_abs = np.exp(- x**2 / (2 * sigma[0]**2)) / np.sqrt(2 * np.pi * sigma[0]**2)
     return p_pres * g_t + p_abs * (1 - g_t)
 
 
@@ -49,12 +37,13 @@ def posterior(x, g_t, C, sigma):
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    p_given_true = (g_t * np.exp(- (x - C)**2 / (2 * sigma**2)))
+    p_given_true = (g_t * np.exp(- (x - C)**2 / (2 * sigma[int(C)]**2)))
     if C == 1:
         othmean = 0
     elif C == 0:
         othmean = 1
-    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- (x - othmean)**2 / (2 * sigma**2)))
+    return p_given_true / (p_given_true +
+                           (1 - g_t) * np.exp(- (x - othmean)**2 / (2 * sigma[othmean]**2)))
 
 
 def simulate_observer(arglist):
@@ -68,7 +57,7 @@ def simulate_observer(arglist):
     while t < (T - dt):
         step += 1
         t = step * dt
-        x_t = np.random.normal(C, sigma) * dt
+        x_t = np.random.normal(C, sigma[C]) * dt
         g_t[step] = posterior(x_t, g_t[step - 1], C, sigma)
         nearest_grid = np.abs(g_values - g_t[step]).argmin()
         decision_t = decisions[nearest_grid, step]
@@ -92,6 +81,7 @@ def main(argvec):
                     rootgrid[i, j] = -150
                 elif g_t < g_tp1:
                     rootgrid[i, j] = 150
+
     # Define the reward array
     R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
                   (punishment, reward)])  # (pres/abs, pres/pres) in form decision / actual
@@ -131,25 +121,13 @@ def main(argvec):
     # C_vals = [0, 1] * 200
     # arglists = it.product(C_vals, [decisions])
     # observer_outputs = pool.map(simulate_observer, arglists)
-    # numsims = 2000
-    # C_vals = [0] * numsims
-    # C_vals.extend([1] * numsims)
-    # observer_outputs = []
-    # for C in C_vals:
-    #     observer_outputs.append(simulate_observer([C, decisions, sigma, dt]))
+    numsims = 2000
+    C_vals = [0] * numsims
+    C_vals.extend([1] * numsims)
+    observer_outputs = []
+    for C in C_vals:
+        observer_outputs.append(simulate_observer([C, decisions, sigma, dt]))
 
-    # g_grid = np.array([x[2] for x in observer_outputs])
-    # response_times = np.array([x[1] for x in observer_outputs])
+    g_grid = np.array([x[2] for x in observer_outputs])
+    response_times = np.array([x[1] for x in observer_outputs])
     return g_grid, response_times, decisions
-
-
-if __name__ == '__main__':
-    rho = 0.035
-    reward = 3
-    punishment = -.1
-    dt = 0.02
-    multiple_trials = {}
-    sigma_list = np.linspace(0.9, 10, 50)
-    for sigma in sigma_list:
-        multiple_trials[sigma] = main([dt, sigma, rho, reward, punishment])
-
