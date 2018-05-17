@@ -13,9 +13,10 @@ T = 6
 t_w = 0.5
 N=8
 size = 10
+sigma = 1
 
 value_space = np.linspace(10**-3, 1-10**-3, size)
-
+ 
 grid_values = np.zeros((size, size, size, size), dtype = tuple)
 for i in range(size):
     for j in range(size):
@@ -23,7 +24,7 @@ for i in range(size):
             for z in range(size):
                 grid_values[i][j][y][z]=(value_space[i],value_space[j],value_space[y],value_space[z])
                 
-print(grid_values.shape)                
+print(grid_values.shape)       
 
 #phi_values = np.zeros((size, size), dtype = tuple)
 #for i in range(size):
@@ -87,15 +88,28 @@ def p_new_ev_switch(x, Phi, sigma, k):
     
     return (1-g_t)*draw_0+g_t*(weight_draw_pres)
 
-#def get_Update_X(Phi):
-#    update_Xs = np.zeros(size)
-#    for i in range(size):
-#        for j in range(size):
-#            ## the value of X such that Phi_t is updated to each potential new Phi_t+1
-#            
-#            update_Xs[i] = 
-#    
+def get_Update_X(Phi_t):
+    '''
+    takes a Phi and returns a size**4 vector of x's that update current Phi to future Phi
+    '''
+    update_Xs = np.zeros_like(grid_values, dtype = list)
+    phi_roots = np.zeros(size)
 
+    for i in range(size):
+        phi_tp1 = value_space[i]
+        phi_t = Phi_t[0]
+            ## the values of X such that Phi_t is updated to each potential new Phi_t+1
+        try:
+            phi_roots[i] = brentq(lambda x: phi_tp1 - np.exp(-(x-1)**2 / (2 * sigma**2))*phi_t, -150, 150)  # root finding
+        except ValueError:
+            if phi_t > phi_tp1:
+                phi_roots[i] = -150
+            elif phi_t < phi_tp1:
+                phi_roots[i] = 150
+           
+    return phi_roots
+
+print(get_Update_X((0.25, 0.25, 0.25,0.25)))
 
     
     
@@ -122,6 +136,9 @@ def main(argvec):
     V_base = np.zeros((size**4, int(T/dt)))
     V_base[:, -1] = np.max(decision_vals, axis = 1)
     
+    decisions = np.zeros((size**4, int(T / dt)))
+
+    #backwards induction through time 
     for index in range(2, int(T/dt)+1):
         tau = (index-1)*dt 
         t= T-tau 
@@ -129,15 +146,33 @@ def main(argvec):
         
         for i in range(size):
             Phi = grid_values.flatten[i]
-            roots = root_grid[i, :]
+            roots = update_Xs(Phi)
             new_phi_probs = p_new_ev_stay(roots, Phi, sigma, N)
             new_phi_probs = new_phi_probs / np.sum(new_phi_probs)
             V_stay = np.sum(new_phi_probs * V_base[:, -(index-1)]) - rho * t 
             
-            
-            
-            
+            V_base[i, -index] = np.amax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
+            decisions[i, -index] = np.argmax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
+    
+    V_full = V_base.expand_dims(np.arrange(N), 3)
+    decision_full = decisions.expand_dims(np.arange(N), 3)
+    
+    ###backwards induction through items 
+    
+    for index in range(1, N):
+        V_item = V_full[:,:,index]
+        decision_item = decision_full[:,:,index]
+        for i in range(size**4): 
+            for j in range(int(T/dt)):
+            V_switch = 
+            if V_switch > V_item[i, j]: 
+                V_item[i,j] = V_switch 
+                decision_item[i, j] = 3
+        V_full[:,:,index] =  V_item
+        decision_full[:,:,index] = decision_item
 
+        
+    
 if __name__ == '__main__':
     rho = 0.1
     reward = 1
