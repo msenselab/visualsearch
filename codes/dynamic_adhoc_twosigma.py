@@ -69,18 +69,26 @@ def simulate_observer(arglist):
 def main(argvec):
     dt, sigma, rho, reward, punishment = argvec
     # First we find the roots of f(x) for all values of g_t and g_(t+1)
-    rootgrid = np.zeros((size, size))  # NxN grid of values for g_t, g_tp1
+    testx = np.linspace(-150, 150, 1000)
+    if sigma[1] < sigma[0]:
+        ourpeak = testx[np.argmax(f(testx, 0.5, sigma))]
+    elif sigma[0] < sigma[1]:
+        ourpeak = testx[np.argmin(f(testx, 0.5, sigma))]
+    rootgrid = np.zeros((size, size, 2))  # NxN grid of values for g_t, g_tp1
     for i in range(size):
         g_t = g_values[i]
         for j in range(size):
             g_tp1 = g_values[j]
             try:
-                rootgrid[i, j] = brentq(lambda x: g_tp1 - f(x, g_t, sigma), -150, 150)  # root finding
+                rootgrid[i, j, 0] = brentq(lambda x: g_tp1 - f(x, g_t, sigma), -150, ourpeak)
+                rootgrid[i, j, 1] = brentq(lambda x: g_tp1 - f(x, g_t, sigma), ourpeak, 150)
             except ValueError:
                 if g_t > g_tp1:
-                    rootgrid[i, j] = -150
+                    rootgrid[i, j, 0] = -150
+                    rootgrid[i, j, 1] = -150
                 elif g_t < g_tp1:
-                    rootgrid[i, j] = 150
+                    rootgrid[i, j, 0] = 150
+                    rootgrid[i, j, 1] = 150
 
     # Define the reward array
     R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
@@ -107,9 +115,10 @@ def main(argvec):
 
         for i in range(size):
             g_t = g_values[i]  # Pick ith value of g at t
-            roots = rootgrid[i, :]  # Slice roots of our given g_t across all g_(t+1)
+            roots = rootgrid[i, :, :]  # Slice roots of our given g_t across all g_(t+1)
             new_g_probs = p_new_ev(roots, g_t, sigma)  # Find the likelihood of roots x_(t+1)
             new_g_probs = new_g_probs / np.sum(new_g_probs)  # Normalize
+            new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
             V_wait = np.sum(new_g_probs * V_full[:, -(index - 1)]) - rho * t  # Sum and subt op cost
 
             # Find the maximum value b/w waiting and two decision options. Store value and identity.
