@@ -1,11 +1,20 @@
 '''
-first go at writing the functions for static case 
+Dear Burk, 
 
+Hope this finds you well. So the big idea goes like this: recall there are four cases in this Bellman equation, choose abs, 
+choose pres, switch, stay. Your code solves for both choice options and the expected value for stay. Moreover, since the 
+expected value for staying only depends future draws from the CURRENT item, those three values will be constant even as the
+current item changes. So what I've begun to do bellow is create a V_base which is basically the output of the ad-hoc dynamic 
+case model, backwards induction through time. With this as a basis I then loop through N such grids to do backwards induction 
+through items. There are two main pieces not working, first finding the x responsible for an update to the phi values, the 
+analog of the root finding procedure that we were discussing, second the backwards induction through items, which should 
+be pretty straightforward... it just isn't complete yet. Remember Phi=(phi, phi_bar, beta, beta_bar)
 '''
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq, minimize
+from itertools import product
 import seaborn as sbn
 
 #number of items in display 
@@ -15,23 +24,25 @@ N=8
 size = 10
 sigma = 1
 
+
+##values that grid points might take 
 value_space = np.linspace(10**-3, 1-10**-3, size)
- 
-grid_values = np.zeros((size, size, size, size), dtype = tuple)
-for i in range(size):
-    for j in range(size):
-        for y in range(size):
-            for z in range(size):
-                grid_values[i][j][y][z]=(value_space[i],value_space[j],value_space[y],value_space[z])
-                
-print(grid_values.shape)       
 
-#phi_values = np.zeros((size, size), dtype = tuple)
-#for i in range(size):
-#    for j in range(size):
-#        phi_values[i][j] = (value_space[i], value_space[j])
+def combs(a, r): 
+    """
+    Return successive r-length cartesian product of values in a... 
+    basically just sets up the grid - I know this doesn't have to be a fucntion 
+    but thats how it got written in my head and I haven't changed it yet
+    """
+    a = np.asarray(a)
+    dt = np.dtype([('', a.dtype)]*r)
+    b = np.fromiter(product(a, repeat = r), dt)
+    return b.view(a.dtype).reshape(-1, r)
 
-#k throughout is the number of unobserved positions
+grid_val_test = combs(value_space, 4)
+
+print(grid_val_test.shape)
+
 
 def global_posterior(Phi, k):
     '''
@@ -72,7 +83,7 @@ def p_new_ev_stay(x, Phi, sigma, k):
 def p_new_ev_switch(x, Phi, sigma, k):    
     '''
     this returns the probability of a new piece of evidence given 
-    evidence set Phi for the staying case, Phi is a vector length 4
+    evidence set Phi for the switching case, Phi is a vector length 4
     '''
     phi = Phi[0], phi_bar = Phi[1], beta=Phi[2], beta_bar = Phi[3]
     g_t = global_posterior(phi, phi_bar, beta, beta_bar, k)
@@ -88,9 +99,13 @@ def p_new_ev_switch(x, Phi, sigma, k):
     
     return (1-g_t)*draw_0+g_t*(weight_draw_pres)
 
+
+
 def get_Update_X(Phi_t):
     '''
     takes a Phi and returns a size**4 vector of x's that update current Phi to future Phi
+    it should be noted that updates only apply to the phi's and so the same update vector 
+    can be used for all Phi with given phi, phi_bar
     '''
     update_Xs = np.zeros_like(grid_values, dtype = list)
     phi_roots = np.zeros(size)
@@ -139,12 +154,13 @@ def main(argvec):
     decisions = np.zeros((size**4, int(T / dt)))
 
     #backwards induction through time 
+    #this emulates the code for the adhoc model 
     for index in range(2, int(T/dt)+1):
         tau = (index-1)*dt 
         t= T-tau 
         print(t)
         
-        for i in range(size):
+        for i in range(size**4):
             Phi = grid_values.flatten[i]
             roots = update_Xs(Phi)
             new_phi_probs = p_new_ev_stay(roots, Phi, sigma, N)
@@ -160,12 +176,13 @@ def main(argvec):
     ###backwards induction through items 
     
     for index in range(1, N):
-        V_item = V_full[:,:,index]
-        decision_item = decision_full[:,:,index]
+        V_item = V_full[:,:,N-index]
+        decision_item = decision_full[:,:,N-index]
         for i in range(size**4): 
             for j in range(int(T/dt)):
-            V_switch = 
+            V_switch = #HERE CALCULATE THE EXPECPTED VALUE FOR SWITCHING, should be analogous except with the ev_prob_switch function defined above
             if V_switch > V_item[i, j]: 
+                #it switch is more valuable, update the value function and the decision 
                 V_item[i,j] = V_switch 
                 decision_item[i, j] = 3
         V_full[:,:,index] =  V_item
