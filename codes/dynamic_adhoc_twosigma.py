@@ -11,10 +11,11 @@ import itertools as it
 import seaborn as sbn
 import time
 from scipy.optimize import brentq
+from matplotlib.animation import FuncAnimation
 import pickle
 import os
 
-T = 10
+T = 25
 t_w = 0.5
 size = 100
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
@@ -150,7 +151,7 @@ def main(argvec):
     C_vals.extend([1] * numsims)
     arglists = it.product(C_vals, [decisions], [sigma], [dt])
     observer_outputs = pool.map(simulate_observer, arglists)
-
+    pool.close()
     g_grid = np.array([x[2] for x in observer_outputs])
     response_times = np.array([x[1] for x in observer_outputs])
     return g_grid, response_times, decisions
@@ -162,19 +163,37 @@ if __name__ == '__main__':
     punishment = -.1
     dt = 0.02
     multiple_trials = {}
-    sigmas = np.linspace(0.9, 10, 10)
+    sigmas = np.linspace(0.9, 15, 10)
     raw_pairs = list(it.product(sigmas, sigmas))
     sigma_list = [x for x in raw_pairs if x[0] != x[1]]
     for sigma in sigma_list:
         multiple_trials[sigma] = main([dt, np.array(sigma), rho, reward, punishment])
 
     currtime = time.localtime()
-    filename = os.getenv("HOME") + '/Documents/sigma_param_search_{}_{}_{}'.format(currtime.tm_mday,
-                                                                                   currtime.tm_mon,
-                                                                                   currtime.tm_year)
-    fw = open(filename, 'wb')
+    filename = os.getenv("HOME") + '/Documents/two_sigma_search_{}_{}_{}'.format(currtime.tm_mday,
+                                                                                 currtime.tm_mon,
+                                                                                 currtime.tm_year)
+    fw = open(filename + '.p', 'wb')
     outdict = {'trials_dict': multiple_trials, 'T': T, 'dt': dt, 't_w': t_w, 'size': size,
                'g_values': g_values, 'rho': rho, 'reward': reward, 'punishment': punishment}
     pickle.dump(outdict, fw)
     fw.close()
 
+    # Plotting code
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    def anim_update(i):
+        ax.clear()
+        currkey = sigma_list[i]
+        sbn.kdeplot(multiple_trials[currkey][1][:2000], shade=True, color='g',
+                    label='Target Absent', alpha=0.5, bw=0.1)
+        sbn.kdeplot(multiple_trials[currkey][1][2000:], shade=True, color='b',
+                    label='Target Present', alpha=0.5, bw=0.1)
+        ax.set_xlim([0, 10])
+        ax.set_ylim([0, 20])
+        ax.set_title(r'$\sigma_{abs} = $' + str(currkey[0]) + r' $\sigma_{pres} = $' + str(currkey[1]))
+
+    anim = FuncAnimation(fig, anim_update, frames=len(sigma_list), interval=2500)
+    anim.save(filename + '_animated_responsedist.mp4')

@@ -9,6 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq
 import seaborn as sbn
+import itertools as it
+import multiprocessing as mulpro
 
 T = 10
 t_w = 0.5
@@ -127,19 +129,17 @@ def main(argvec):
             decisions[i, -index] = np.argmax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
 
     # Simulate a pool of observers
-    # pool = mulpro.Pool(processes=8)
-    # C_vals = [0, 1] * 200
-    # arglists = it.product(C_vals, [decisions])
-    # observer_outputs = pool.map(simulate_observer, arglists)
-    # numsims = 2000
-    # C_vals = [0] * numsims
-    # C_vals.extend([1] * numsims)
-    # observer_outputs = []
-    # for C in C_vals:
-    #     observer_outputs.append(simulate_observer([C, decisions, sigma, dt]))
+    numsims = 2000
+    C_vals = [0] * numsims
+    C_vals.extend([1] * numsims)
 
-    # g_grid = np.array([x[2] for x in observer_outputs])
-    # response_times = np.array([x[1] for x in observer_outputs])
+    pool = mulpro.Pool(processes=8)
+    C_vals = [0, 1] * 200
+    arglists = it.product(C_vals, [decisions])
+    observer_outputs = pool.map(simulate_observer, arglists)
+
+    g_grid = np.array([x[2] for x in observer_outputs])
+    response_times = np.array([x[1] for x in observer_outputs])
     return g_grid, response_times, decisions
 
 
@@ -152,4 +152,3 @@ if __name__ == '__main__':
     sigma_list = np.linspace(0.9, 10, 50)
     for sigma in sigma_list:
         multiple_trials[sigma] = main([dt, sigma, rho, reward, punishment])
-
