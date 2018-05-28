@@ -23,29 +23,39 @@ savepath = '../figs/'
 usePandas = True
 
 if usePandas:
-    exp1 = pd.read_csv(datapath + 'exp1.csv',index_col = None) # read data
-    exp1.rename(columns = {'sub':'subno'},inplace = True) # .sub is a keyword, change it
+    exp1 = pd.read_csv(datapath + 'exp1.csv', index_col=None)  # read data
+    # .sub is a keyword, change it
+    exp1.rename(columns={'sub': 'subno'}, inplace=True)
     # filter correct trials, group by factors and average RTs
-    mrt = exp1.query('correct == 1') \
-            .groupby(['subno','dyn','setsize','target'])\
-            .agg({'rt':'mean'}).reset_index() 
-    # visualize it   
-    sns.factorplot(x='setsize', y = 'rt', hue = 'target',col = 'dyn',data = mrt)
-    
+    mrt = exp1.query('correct == 1')\
+        .groupby(['subno', 'dyn', 'setsize', 'target'])\
+        .agg({'rt': 'mean'}).reset_index()
+    # visualize it
+    sns.factorplot(x='setsize', y='rt', hue='target', col='dyn', data=mrt)
 
-# original code       
+    rt_dists = exp1.query('correct == 1 & dyn == \'Dynamic\'')
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    presdist = rt_dists.query('target == \'Present\'')
+    absdist = rt_dists.query('target == \'Absent\'')
+    sns.kdeplot(presdist.rt, shade=True, bw=0.1, color='b', label='Data Target Pres', alpha=0.5)
+    sns.kdeplot(absdist.rt, shade=True, bw=0.1, color='g', label='Data Target Abs', alpha=0.5)
+
+
+
+# original code
 else:
     # load in experiment 1: No rewards for answers
     readfile = open(datapath + 'exp1.csv', 'r')
     reader = csv.reader(readfile)
-    
+
     exp1 = []
     for row in reader:
         exp1.append(row)
     exp1 = np.array(exp1[1:])
     subs = [x[-3] for x in exp1]
     numsubs = len(set(subs))
-    
+
     # iterate through combinations of set size, display condition,
     # and correct/incorrect response
     response_times = {}
@@ -53,9 +63,9 @@ else:
     setsizes = [8, 12, 16]
     targets = ['Present', 'Absent']
     displays = ['Static', 'Dynamic']
-    
+
     combinations = it.product(setsizes, displays, targets)
-    
+
     # create a list of the response times for each combination of conditions and
     # store it in the dict of response times
     for setsize, display, target in combinations:
@@ -64,7 +74,7 @@ else:
                    and x[0] == str(target)
                    and x[-1] == str(response)]
         response_times[(setsize, display, target)] = np.array(set_rts)
-    
+
     setsize_traces = {}
     for i, display in enumerate(displays):
         for j, target in enumerate(targets):
@@ -75,7 +85,7 @@ else:
                 mean = np.mean(currdata)
                 sem = np.std(currdata) / np.sqrt(numsubs)
                 setsize_traces[(display, target)].append((mean, sem))
-    
+
     plt.figure()
     for display in displays:
         if display == 'Dynamic':

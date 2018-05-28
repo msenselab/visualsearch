@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mulpro
 import itertools as it
-import seaborn as sbn
+import seaborn as sns
 import time
 from scipy.optimize import brentq
 from matplotlib.animation import FuncAnimation
@@ -187,12 +187,14 @@ if __name__ == '__main__':
     def anim_update(i):
         ax.clear()
         currkey = sigma_list[i]
-        sbn.kdeplot(multiple_trials[currkey][1][:2000], shade=True, color='g',
-                    label='Target Absent', alpha=0.5, bw=0.1)
-        sbn.kdeplot(multiple_trials[currkey][1][2000:], shade=True, color='b',
-                    label='Target Present', alpha=0.5, bw=0.1)
-        ax.set_xlim([0, 10])
-        ax.set_ylim([0, 20])
+        obsweights = np.ones(2000) / 2000
+        obsbins = np.linspace(0, T, int(T / dt / 5))
+        plt.hist(multiple_trials[currkey][1][:2000], color='g', bins=obsbins,
+                 label='Target Absent', alpha=0.5, weights=obsweights)
+        plt.hist(multiple_trials[currkey][1][2000:], color='b', bins=obsbins,
+                 label='Target Present', alpha=0.5, weights=obsweights)
+        ax.set_xlim([0, 6])
+        ax.set_ylim([0, 1])
         ax.set_title(r'$\sigma_{abs} = $' + str(currkey[0]) + r' $\sigma_{pres} = $' + str(currkey[1]))
 
     anim = FuncAnimation(fig, anim_update, frames=len(sigma_list), interval=2500)
