@@ -26,7 +26,7 @@ def f(x, g_t, sigma):
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    p_given_true = (g_t * np.exp(- (x-1)**2 / (2 * sigma[1]**2)))
+    p_given_true = (g_t * np.exp(- (x - 1)**2 / (2 * sigma[1]**2)))
     return p_given_true / (p_given_true + (1 - g_t) * np.exp(- x**2 / (2 * sigma[0]**2)))
 
 
@@ -74,8 +74,7 @@ def simulate_observer(arglist):
     return (decision_t, t, g_t)
 
 
-def main(argvec):
-    dt, sigma, rho, reward, punishment = argvec
+def main(dt, sigma, rho, reward, punishment):
     # First we find the roots of f(x) for all values of g_t and g_(t+1)
     testx = np.linspace(-150, 150, 1000)
     if sigma[1] < sigma[0]:
@@ -167,7 +166,7 @@ if __name__ == '__main__':
     raw_pairs = list(it.product(sigmas, sigmas))
     sigma_list = [x for x in raw_pairs if x[0] != x[1]]
     for sigma in sigma_list:
-        multiple_trials[sigma] = main([dt, np.array(sigma), rho, reward, punishment])
+        multiple_trials[sigma] = main(dt, np.array(sigma), rho, reward, punishment)
 
     currtime = time.localtime()
     filename = os.getenv("HOME") + '/Documents/two_sigma_search_{}_{}_{}'.format(currtime.tm_mday,
@@ -195,7 +194,8 @@ if __name__ == '__main__':
                  label='Target Present', alpha=0.5, weights=obsweights)
         ax.set_xlim([0, 6])
         ax.set_ylim([0, 1])
-        ax.set_title(r'$\sigma_{abs} = $' + str(currkey[0]) + r' $\sigma_{pres} = $' + str(currkey[1]))
+        ax.set_title(r'$\sigma_{abs} = $' +
+                     str(currkey[0]) + r' $\sigma_{pres} = $' + str(currkey[1]))
 
     anim = FuncAnimation(fig, anim_update, frames=len(sigma_list), interval=2500)
     anim.save(filename + '_animated_responsedist.mp4')
