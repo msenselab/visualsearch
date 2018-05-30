@@ -42,7 +42,6 @@ if usePandas:
     sns.kdeplot(absdist.rt, shade=True, bw=0.1, color='g', label='Data Target Abs', alpha=0.5)
 
 
-
 # original code
 else:
     # load in experiment 1: No rewards for answers
