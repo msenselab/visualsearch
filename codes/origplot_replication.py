@@ -40,7 +40,28 @@ if usePandas:
     absdist = rt_dists.query('target == \'Absent\'')
     sns.kdeplot(presdist.rt, shade=True, bw=0.1, color='b', label='Data Target Pres', alpha=0.5)
     sns.kdeplot(absdist.rt, shade=True, bw=0.1, color='g', label='Data Target Abs', alpha=0.5)
+    plt.title('Absent and Present reaction times in correct trials (Dynamic)')
 
+    plt.figure()
+    colors = sns.color_palette('winter', 3)
+    pres8 = presdist.query('setsize == 8')
+    pres12 = presdist.query('setsize == 12')
+    pres16 = presdist.query('setsize == 16')
+    sns.kdeplot(pres8.rt, shade=True, bw=0.1, color=colors[0], label='N = 8', alpha=0.5)
+    sns.kdeplot(pres12.rt, shade=True, bw=0.1, color=colors[1], label='N = 12', alpha=0.5)
+    sns.kdeplot(pres16.rt, shade=True, bw=0.1, color=colors[2], label='N = 16', alpha=0.5)
+    plt.title('Present reaction times by stimuli count in correct trials (Dynamic)')
+    plt.legend()
+
+    plt.figure()
+    abs8 = absdist.query('setsize == 8')
+    abs12 = absdist.query('setsize == 12')
+    abs16 = absdist.query('setsize == 16')
+    sns.kdeplot(abs8.rt, shade=True, bw=0.1, color=colors[0], label='N = 8', alpha=0.5)
+    sns.kdeplot(abs12.rt, shade=True, bw=0.1, color=colors[1], label='N = 12', alpha=0.5)
+    sns.kdeplot(abs16.rt, shade=True, bw=0.1, color=colors[2], label='N = 16', alpha=0.5)
+    plt.title('Absent reaction times by stimuli count in correct trials (Dynamic)')
+    plt.legend()
 
 # original code
 else:

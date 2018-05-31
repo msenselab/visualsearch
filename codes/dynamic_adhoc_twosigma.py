@@ -164,7 +164,7 @@ if __name__ == '__main__':
     raw_pairs = list(it.product(sigmas, sigmas))
     sigma_list = [x for x in raw_pairs if x[0] != x[1]]
     for sigma in sigma_list:
-        multiple_trials[sigma] = main(dt, np.array(sigma), mu, rho, reward, punishment)
+        _, multiple_trials[sigma] = main(dt, np.array(sigma), mu, rho, reward, punishment)
 
     currtime = time.localtime()
     filename = os.getenv("HOME") + '/Documents/two_sigma_search_{}_{}_{}'.format(currtime.tm_mday,
