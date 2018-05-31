@@ -15,58 +15,55 @@ from matplotlib.animation import FuncAnimation
 import pickle
 import os
 
-T = 25
+T = 10
 t_w = 0.5
-size = 100
+size = 400
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
 
 
-def f(x, g_t, sigma):
+def f(x, g_t, sigma, mu):
     ''' x_(t + 1) is x
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    p_given_true = (g_t * np.exp(- (x - 1)**2 / (2 * sigma[1]**2)))
-    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- x**2 / (2 * sigma[0]**2)))
+    p_given_true = (g_t * np.exp(- (x - mu[1])**2 / (2 * sigma[1]**2)))
+    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- (x - mu[0])**2 / (2 * sigma[0]**2)))
 
 
-def p_new_ev(x, g_t, sigma):
+def p_new_ev(x, g_t, sigma, mu):
     ''' The probability of a given observation x_(t+1) given our current belief
     g_t'''
-    p_pres = np.exp(- (x - 1)**2 /
+    p_pres = np.exp(- (x - mu[1])**2 /
                     (2 * sigma[1]**2)) / np.sqrt(2 * np.pi * sigma[1]**2)
-    p_abs = np.exp(- x**2 / (2 * sigma[0]**2)) / \
+    p_abs = np.exp(- (x - mu[0])**2 / (2 * sigma[0]**2)) / \
         np.sqrt(2 * np.pi * sigma[0]**2)
     return p_pres * g_t + p_abs * (1 - g_t)
 
 
-def posterior(x, g_t, C, sigma):
+def posterior(x, g_t, C, sigma, mu):
     ''' x_(t + 1) is x
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    p_given_true = (g_t * np.exp(- (x - C)**2 / (2 * sigma[int(C)]**2)))
+    p_given_true = (g_t * np.exp(- (x - mu[C])**2 / (2 * sigma[C]**2)))
     if C == 1:
         othmean = 0
     elif C == 0:
         othmean = 1
     return p_given_true / (p_given_true +
-                           (1 - g_t) * np.exp(- (x - othmean)**2 / (2 * sigma[othmean]**2)))
+                           (1 - g_t) * np.exp(- (x - mu[othmean])**2 / (2 * sigma[othmean]**2)))
 
 
 def simulate_observer(arglist):
-    C = arglist[0]
-    decisions = arglist[1]
-    sigma = arglist[2]
-    dt = arglist[3]
+    C, decisions, sigma, mu, dt = arglist
     step = 0
     t = 0
     g_t = np.ones(int(T / dt)) * 0.5
     while t < (T - dt):
         step += 1
         t = step * dt
-        x_t = np.random.normal(C, sigma[C]) * dt
-        g_t[step] = posterior(x_t, g_t[step - 1], C, sigma)
+        x_t = np.random.normal(mu[C], sigma[C]) * dt
+        g_t[step] = posterior(x_t, g_t[step - 1], C, sigma, mu)
         nearest_grid = np.abs(g_values - g_t[step]).argmin()
         decision_t = decisions[nearest_grid, step]
         if decision_t != 0:
@@ -74,13 +71,13 @@ def simulate_observer(arglist):
     return (decision_t, t, g_t)
 
 
-def main(dt, sigma, rho, reward, punishment):
+def main(dt, sigma, mu, rho, reward, punishment):
     # First we find the roots of f(x) for all values of g_t and g_(t+1)
     testx = np.linspace(-150, 150, 1000)
     if sigma[1] < sigma[0]:
-        ourpeak = testx[np.argmax(f(testx, 0.5, sigma))]
+        ourpeak = testx[np.argmax(f(testx, 0.5, sigma, mu))]
     elif sigma[0] < sigma[1]:
-        ourpeak = testx[np.argmin(f(testx, 0.5, sigma))]
+        ourpeak = testx[np.argmin(f(testx, 0.5, sigma, mu))]
     rootgrid = np.zeros((size, size, 2))  # NxN grid of values for g_t, g_tp1
     for i in range(size):
         g_t = g_values[i]
@@ -88,9 +85,9 @@ def main(dt, sigma, rho, reward, punishment):
             g_tp1 = g_values[j]
             try:
                 rootgrid[i, j, 0] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma), -150, ourpeak)
+                    lambda x: g_tp1 - f(x, g_t, sigma, mu), -150, ourpeak)
                 rootgrid[i, j, 1] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma), ourpeak, 150)
+                    lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 150)
             except ValueError:
                 if g_t > g_tp1:
                     rootgrid[i, j, 0] = -150
@@ -131,7 +128,7 @@ def main(dt, sigma, rho, reward, punishment):
             # Slice roots of our given g_t across all g_(t+1)
             roots = rootgrid[i, :, :]
             # Find the likelihood of roots x_(t+1)
-            new_g_probs = p_new_ev(roots, g_t, sigma)
+            new_g_probs = p_new_ev(roots, g_t, sigma, mu)
             new_g_probs = new_g_probs / np.sum(new_g_probs)  # Normalize
             new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
             # Sum and subt op cost
@@ -148,7 +145,7 @@ def main(dt, sigma, rho, reward, punishment):
     pool = mulpro.Pool(processes=8)
     C_vals = [0] * numsims
     C_vals.extend([1] * numsims)
-    arglists = it.product(C_vals, [decisions], [sigma], [dt])
+    arglists = it.product(C_vals, [decisions], [sigma], [mu], [dt])
     observer_outputs = pool.map(simulate_observer, arglists)
     pool.close()
     g_grid = np.array([x[2] for x in observer_outputs])
@@ -160,13 +157,14 @@ if __name__ == '__main__':
     rho = 0.05
     reward = 3
     punishment = -.1
-    dt = 0.02
+    dt = 0.01
+    mu = np.array([0, 1])
     multiple_trials = {}
     sigmas = np.linspace(0.9, 15, 10)
     raw_pairs = list(it.product(sigmas, sigmas))
     sigma_list = [x for x in raw_pairs if x[0] != x[1]]
     for sigma in sigma_list:
-        multiple_trials[sigma] = main(dt, np.array(sigma), rho, reward, punishment)
+        multiple_trials[sigma] = main(dt, np.array(sigma), mu, rho, reward, punishment)
 
     currtime = time.localtime()
     filename = os.getenv("HOME") + '/Documents/two_sigma_search_{}_{}_{}'.format(currtime.tm_mday,
