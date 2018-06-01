@@ -36,16 +36,11 @@ def combs(a, r):
     Return successive r-length cartesian product of values in a...
     basically just sets up the grid - I know this doesn't have to be a fucntion
     but thats how it got written in my head and I haven't changed it yet
-
-    ----
-    I simplified it a bit! --Berk
     """
     return np.array(list(product(a, repeat=r)))
 
 
-grid_val_test = combs(value_space, 4)
-
-print(grid_val_test.shape)
+grid_values = combs(value_space, 4)
 
 
 def global_posterior(Phi, k):
@@ -63,7 +58,7 @@ def local_posterior(Phi, k):
     '''
     this is b_t,k in the write up
     '''
-    phi = Phi[0], phi_bar = Phi[1], beta = Phi[2], beta_bar = Phi[3]
+    phi, phi_bar, beta, beta_bar = Phi
 
     pres_likelihood = phi * beta_bar
     Z_b = phi * beta_bar + phi_bar * beta + \
@@ -92,7 +87,7 @@ def p_new_ev_switch(x, Phi, sigma, k):
     this returns the probability of a new piece of evidence given
     evidence set Phi for the switching case, Phi is a vector length 4
     '''
-    phi = Phi[0], phi_bar = Phi[1], beta = Phi[2], beta_bar = Phi[3]
+    phi, phi_bar, beta, beta_bar = Phi
     g_t = global_posterior(phi, phi_bar, beta, beta_bar, k)
 
     Z_b = phi * beta_bar + phi_bar * beta + (N - k) * phi_bar * beta_bar
@@ -115,27 +110,55 @@ def get_Update_X(Phi_t):
     it should be noted that updates only apply to the phi's and so the same update vector
     can be used for all Phi with given phi, phi_bar
     '''
-    update_Xs = np.zeros_like(grid_values, dtype=list)
-    phi_roots = np.zeros(size)
-
+    phi_t = Phi_t[0]
+    phi_bar_t = Phi_t[1]
+    update_Xs = np.zeros((size**4, 2), dtype=tuple)
+    init_roots = np.zeros(size**2)
+    phi_phi_bar_space = combs(value_space, 2)
+    phi_roots = np.zeros((size, 2))
     for i in range(size):
         phi_tp1 = value_space[i]
-        phi_t = Phi_t[0]
         # the values of X such that Phi_t is updated to each potential new Phi_t+1
         try:
-            phi_roots[i] = brentq(lambda x: phi_tp1 - np.exp(-(x - 1)**2 / (2 * sigma**2)) * phi_t,
-                                  -150, 150)  # root finding
+            root_1 = brentq(lambda x: phi_tp1 - np.exp(-(x - 1)**2 / (2 * sigma**2)) * phi_t,
+                                  -150, 1)  # root finding
+            root_2 = brentq(lambda x: phi_tp1 - np.exp(-(x - 1)**2 / (2 * sigma**2)) * phi_t,
+                                  1, 150)  # root finding
         except ValueError:
             if phi_t > phi_tp1:
-                phi_roots[i] = -150
+                root_1 = -150
             elif phi_t < phi_tp1:
-                phi_roots[i] = 150
+                root_2 = 150
+        phi_bar_tp_1 = value_space[np.abs(value_space-root_1*phi_bar_t).argmin()]
+        phi_bar_tp_2 = value_space[np.abs(value_space-root_2*phi_bar_t).argmin()]
+        phi_roots[i][0] = root_1
+        phi_roots[i][1] = root_2  
 
+        for j in range(size):
+            if phi_phi_bar_space[(size*i)+j][1] == phi_bar_tp_1:
+                init_roots[(size*i)+j] = root_1
+            elif phi_phi_bar_space[(size*i)+j][1] == phi_bar_tp_2:
+                init_roots[(size*i)+j] = root_2
+
+    roots = np.c_[phi_phi_bar_space, init_roots]    
+
+    phi_roots = np.c_[value_space, phi_roots]
+    
     return phi_roots
 
+updates = get_Update_X((0.25, 0.25, 0.25, 0.25))
+print(updates)
+with_roots = np.where(updates, [updates[:][2] != 0])
 
-print(get_Update_X((0.25, 0.25, 0.25, 0.25)))
-
+def root_checker(phi, phi_bar, roots_arr): 
+    checks = np.zeros((size**2, 2))
+    for i in range(size**2):
+        pres_check = np.exp(-(roots_arr[i][2] - 1)**2 / (2 * sigma**2)) * phi
+        abs_check = np.exp(-(roots_arr[i][2])**2 / (2 * sigma**2)) * phi_bar
+        checks[i][0] = pres_check
+        checks[i][1] = abs_check
+    checks = np.c_[checks, roots_arr]
+    return checks
 
 def main(argvec):
     dt, sigma, rho, reward, punishment = argvec
@@ -143,12 +166,6 @@ def main(argvec):
     R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
                   (punishment, reward)])  # (pres/abs, pres/pres) in form decision / actual
 
-    root_grid = np.zeros_like(grid_values, dtype=array)
-    for i in range(size):
-        for j in range(size):
-            # the value of X such that Phi_t is updated to each potential new Phi_t+1
-            update_Xs =
-            root_grid[i, j, :, :] = updates_Xs
 
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size**4, 2))
@@ -172,34 +189,34 @@ def main(argvec):
 
         for i in range(size**4):
             Phi = grid_values.flatten[i]
-            roots = update_Xs(Phi)
+            roots = get_Update_X(Phi)
             new_phi_probs = p_new_ev_stay(roots, Phi, sigma, N)
             new_phi_probs = new_phi_probs / np.sum(new_phi_probs)
             V_stay = np.sum(new_phi_probs * V_base[:, -(index - 1)]) - rho * t
 
-            V_base[i, -index] = np.amax((V_wait,
+            V_base[i, -index] = np.amax((V_stay,
                                          decision_vals[i, 0], decision_vals[i, 1]))
-            decisions[i, -index] = np.argmax((V_wait,
+            decisions[i, -index] = np.argmax((V_stay,
                                               decision_vals[i, 0], decision_vals[i, 1]))
 
     V_full = V_base.expand_dims(np.arrange(N), 3)
     decision_full = decisions.expand_dims(np.arange(N), 3)
 
     # backwards induction through items
-
+'''
     for index in range(1, N):
         V_item = V_full[:, :, N - index]
         decision_item = decision_full[:, :, N - index]
         for i in range(size**4):
             for j in range(int(T / dt)):
-            V_switch =  # HERE CALCULATE THE EXPECPTED VALUE FOR SWITCHING, should be analogous except with the ev_prob_switch function defined above
+            #V_switch =   HERE CALCULATE THE EXPECPTED VALUE FOR SWITCHING, should be analogous except with the ev_prob_switch function defined above
             if V_switch > V_item[i, j]:
                 # it switch is more valuable, update the value function and the decision
                 V_item[i, j] = V_switch
                 decision_item[i, j] = 3
         V_full[:, :, index] = V_item
         decision_full[:, :, index] = decision_item
-
+'''
 
 if __name__ == '__main__':
     rho = 0.1
