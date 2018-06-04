@@ -1,18 +1,3 @@
-'''
-Dear Berk,
-
-Hope this finds you well. So the big idea goes like this: recall there are four cases in this
-Bellman equation, choose abs, choose pres, switch, stay. Your code solves for both choice options
-and the expected value for stay. Moreover, since the expected value for staying only depends future
-draws from the CURRENT item, those three values will be constant even as the current item changes.
-So what I've begun to do below is create a V_base which is basically the output of the ad-hoc
-dynamic case model, backwards induction through time. With this as a basis I then loop through N
-such grids to do backwards induction through items. There are two main pieces not working,
-first finding the x responsible for an update to the phi values, the analog of the root finding
-procedure that we were discussing, second the backwards induction through items, which should
-be pretty straightforward... it just isn't complete yet. Remember Phi=(phi, phi_bar, beta, beta_bar)
-'''
-
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq, minimize
@@ -112,7 +97,6 @@ def get_Update_X(Phi_t):
     '''
     phi_t = Phi_t[0]
     phi_bar_t = Phi_t[1]
-    update_Xs = np.zeros((size**4, 2), dtype=tuple)
     init_roots = np.zeros(size**2)
     phi_phi_bar_space = combs(value_space, 2)
     phi_roots = np.zeros((size, 2))
@@ -121,7 +105,7 @@ def get_Update_X(Phi_t):
         # the values of X such that Phi_t is updated to each potential new Phi_t+1
         try:
             root_1 = brentq(lambda x: phi_tp1 - np.exp(-(x - 1)**2 / (2 * sigma**2)) * phi_t,
-                                  -150, 1)  # root finding
+                                  -150, 150)  # root finding
             root_2 = brentq(lambda x: phi_tp1 - np.exp(-(x - 1)**2 / (2 * sigma**2)) * phi_t,
                                   1, 150)  # root finding
         except ValueError:
@@ -129,10 +113,10 @@ def get_Update_X(Phi_t):
                 root_1 = -150
             elif phi_t < phi_tp1:
                 root_2 = 150
-        phi_bar_tp_1 = value_space[np.abs(value_space-root_1*phi_bar_t).argmin()]
-        phi_bar_tp_2 = value_space[np.abs(value_space-root_2*phi_bar_t).argmin()]
+        phi_bar_tp_1 = value_space[np.abs(value_space-(root_1*phi_bar_t)).argmin()]
+        phi_bar_tp_2 = value_space[np.abs(value_space-(root_2*phi_bar_t)).argmin()]
         phi_roots[i][0] = root_1
-        phi_roots[i][1] = root_2  
+        phi_roots[i][1] = root_2
 
         for j in range(size):
             if phi_phi_bar_space[(size*i)+j][1] == phi_bar_tp_1:
@@ -140,17 +124,19 @@ def get_Update_X(Phi_t):
             elif phi_phi_bar_space[(size*i)+j][1] == phi_bar_tp_2:
                 init_roots[(size*i)+j] = root_2
 
-    roots = np.c_[phi_phi_bar_space, init_roots]    
+    roots = np.c_[phi_phi_bar_space, init_roots]
 
     phi_roots = np.c_[value_space, phi_roots]
-    
+
     return phi_roots
 
 updates = get_Update_X((0.25, 0.25, 0.25, 0.25))
 print(updates)
-with_roots = np.where(updates, [updates[:][2] != 0])
 
-def root_checker(phi, phi_bar, roots_arr): 
+
+
+
+def root_checker(phi, phi_bar, roots_arr):
     checks = np.zeros((size**2, 2))
     for i in range(size**2):
         pres_check = np.exp(-(roots_arr[i][2] - 1)**2 / (2 * sigma**2)) * phi
