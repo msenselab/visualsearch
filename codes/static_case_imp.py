@@ -124,8 +124,6 @@ def get_Update_X(Phi_t):
         #of phi_bar_tp1 that would result from an update with the same root
         phi_bar_tp_1 = value_space[np.abs(value_space-(root_1*phi_bar_t)).argmin()]
         phi_bar_tp_2 = value_space[np.abs(value_space-(root_2*phi_bar_t)).argmin()]
-        phi_roots[i][0] = root_1
-        phi_roots[i][1] = root_2
         #based on the aquired phi_bar_tp1, we match the root_1
         # with the proper phi_tp1, phi_bar_tp1 pair 
         for j in range(size):
