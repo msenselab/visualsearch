@@ -95,40 +95,49 @@ def get_Update_X(Phi_t):
     it should be noted that updates only apply to the phi's and so the same update vector
     can be used for all Phi with given phi, phi_bar
     '''
+    #the current phi values based on location in the grid
     phi_t = Phi_t[0]
     phi_bar_t = Phi_t[1]
-    init_roots = np.zeros(size**2)
+    ##An initial matrix of root values to be computed for each potential 
+    ##phi_tp1 and phi_bar_tp1 pair, later to be expanded for size^4 space
+    init_roots = np.full((size**2,2), 150)
+    ##phi, phi_bar pairs 
     phi_phi_bar_space = combs(value_space, 2)
-    phi_roots = np.zeros((size, 2))
+    
     for i in range(size):
+        #we look at possible values of phi_tp1 
         phi_tp1 = value_space[i]
-        # the values of X such that Phi_t is updated to each potential new Phi_t+1
+        # the get values of X such that Phi_t is updated to each potential new Phi_t+1
         try:
             root_1 = brentq(lambda x: phi_tp1 - np.exp(-(x - 1)**2 / (2 * sigma**2)) * phi_t,
-                                  -150, 150)  # root finding
+                                  -150, 1)  # root finding
             root_2 = brentq(lambda x: phi_tp1 - np.exp(-(x - 1)**2 / (2 * sigma**2)) * phi_t,
                                   1, 150)  # root finding
         except ValueError:
             if phi_t > phi_tp1:
                 root_1 = -150
+                root_2 = -150
             elif phi_t < phi_tp1:
+                root_1 = 150
                 root_2 = 150
+        #using the root values for phi_tp1, we find the correspondent value 
+        #of phi_bar_tp1 that would result from an update with the same root
         phi_bar_tp_1 = value_space[np.abs(value_space-(root_1*phi_bar_t)).argmin()]
         phi_bar_tp_2 = value_space[np.abs(value_space-(root_2*phi_bar_t)).argmin()]
         phi_roots[i][0] = root_1
         phi_roots[i][1] = root_2
-
+        #based on the aquired phi_bar_tp1, we match the root_1
+        # with the proper phi_tp1, phi_bar_tp1 pair 
         for j in range(size):
             if phi_phi_bar_space[(size*i)+j][1] == phi_bar_tp_1:
-                init_roots[(size*i)+j] = root_1
+                init_roots[(size*i)+j][0] = root_1
             elif phi_phi_bar_space[(size*i)+j][1] == phi_bar_tp_2:
-                init_roots[(size*i)+j] = root_2
+                init_roots[(size*i)+j][1] = root_2
 
     roots = np.c_[phi_phi_bar_space, init_roots]
 
-    phi_roots = np.c_[value_space, phi_roots]
 
-    return phi_roots
+    return roots
 
 updates = get_Update_X((0.25, 0.25, 0.25, 0.25))
 print(updates)
