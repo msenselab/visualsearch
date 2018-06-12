@@ -26,8 +26,8 @@ def f(x, g_t, sigma, mu):
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    p_given_true = (g_t * (sigma[1]**-1) * np.exp(- (x - mu[1])**2 / (2 * sigma[1]**2)))
-    return p_given_true / (p_given_true + (1 - g_t) * (sigma[0]**-1) * np.exp(- (x - mu[0])**2 /
+    p_given_true = (g_t * np.exp(- (x - mu[1])**2 / (2 * sigma[1]**2)))
+    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- (x - mu[0])**2 /
                                                                               (2 * sigma[0]**2)))
 
 
