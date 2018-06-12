@@ -161,11 +161,11 @@ if __name__ == '__main__':
     dt = 0.01
     mu = np.array([0, 1])
     multiple_trials = {}
-    sigmas = np.linspace(0.9, 15, 10)
+    sigmas = np.linspace(0.9, 15, 4)
     raw_pairs = list(it.product(sigmas, sigmas))
     sigma_list = [x for x in raw_pairs if x[0] != x[1]]
     for sigma in sigma_list:
-        _, multiple_trials[sigma] = main(dt, np.array(sigma), mu, rho, reward, punishment)
+        multiple_trials[sigma] = main(dt, np.array(sigma), mu, rho, reward, punishment)[1:]
 
     currtime = time.localtime()
     filename = os.getenv("HOME") + '/Documents/two_sigma_search_{}_{}_{}'.format(currtime.tm_mday,
