@@ -20,6 +20,35 @@ t_w = 0.5
 size = 100
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
 
+#functions that map from the fine sigma to a coarse grained mean and sd for pres and absent dist
+def d_map(N, epsilons, fine_sigma):
+    return -1*(1/(2*(fine_sigma**2)))+np.log(1/N)+np.log(np.sum(np.exp(epsilons/fine_sigma**2)))
+
+def sample_epsilon(C, N, fine_sigma):
+    epsilons = np.random.normal(0, fine_sigma, N)
+    if C == 1:
+        epsilons[0] = np.random.normal(1, fine_sigma)
+    return epsilons
+
+def get_coarse_stats(N, fine_sigma, num_samples):
+    '''
+    returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats 
+    row 1 is the mean and row 2 is the sd 
+    '''
+    returns 
+    stats = np.zeros((2,2))
+    pres_samples = []
+    abs_samples = []
+    for i in range(num_samples): 
+        pres_samples.append(d_map(N, sample_epsilon(1, N, fine_sigma), fine_sigma))
+        abs_samples.append(d_map(N, sample_epsilon(0, N, fine_sigma), fine_sigma))
+
+    stats[0][0] = np.mean(abs_samples) 
+    stats[0][1] = np.sqrt(np.var(abs_samples))
+    stats[1][0] = np.mean(pres_samples) 
+    stats[1][1] = np.sqrt(np.var(pres_samples))
+
+    return stats
 
 def f(x, g_t, sigma, mu):
     ''' x_(t + 1) is x
