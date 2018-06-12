@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import norm
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq, minimize
 from itertools import product
@@ -8,7 +9,7 @@ T = 6
 t_w = 0.5
 N = 8
 size = 10
-sigma = 5
+sigma = 1
 
 
 # values that grid points might take
@@ -18,22 +19,19 @@ def combs(a, r):
     """
     Return successive r-length cartesian product of values in a...
     """
-    return tuple(product(a, repeat=r))
+    return np.array(list(product(a, repeat=r)))
 
 grid_values = combs(grid_space, 4)
 
-def global_posterior(Phi_slice, k):
-    '''
-    this is g_t in the write up
-    '''
-    posts = np.zeros(len(Phi_slice))
-
-    for i in range(len(Phi_slice)):
-        phi, phi_bar, beta, beta_bar = Phi_slice[i]
-        pres_likelihood = 1 / N * (phi * beta_bar + phi_bar * beta + (N - k) * phi_bar * beta_bar)
+def global_posterior(Phi_slice, k): 
+        phi = Phi_slice[:, 0]
+        phi_bar = Phi_slice[:, 1]
+        beta = Phi_slice[:, 2]
+        beta_bar = Phi_slice[:, 3]
+        
+        pres_likelihood = 1 / N * ((phi * beta_bar) + (phi_bar * beta) + ((N - k) * (phi_bar * beta_bar)))
         abs_likelihood = phi_bar * beta_bar
-        posts[i] = pres_likelihood / (pres_likelihood + abs_likelihood)
-    return posts
+        return pres_likelihood/(pres_likelihood + abs_likelihood)
 
 def local_posterior(Phi, k):
     '''
@@ -46,25 +44,30 @@ def local_posterior(Phi, k):
 
     return pres_likelihood / Z_b
 
-def p_new_ev_stay(x, Phi, sigma, k):
+def p_new_ev_stay(Phi, sigma, k):
     '''
     this returns the probability of a new piece of evidence given
     evidence set Phi for the staying case i.e. evidence drawn from
     current location. Phi is a vector length 4.
     '''
-    g_t = global_posterior([Phi], k)
+    g_t = global_posterior(np.reshape(np.array(Phi), (1,4)), k)
     b_t = local_posterior(Phi, k)
-    root_probs = np.zeros(size**4)
-    for i in range(len(x)):
-        cur_root = x[i]
-        prob = 0
-        if len(cur_root) == 0:
-            cur_root = [150]
-        for j in range(len(cur_root)):
-            prob += (1 - g_t) * norm_draw(1, cur_root[j]) + g_t * (b_t * norm_draw(1, cur_root[j]) + (1 - b_t) * norm_draw(0, cur_root[j]))
-        root_probs[i] = prob
+    roots = get_Update_X(Phi)
+    prob_list = np.zeros(size**4)
 
-    return root_probs
+    for x in roots.items(): 
+        if 150 not in x[1]: 
+            prob = np.sum((1 - g_t) * norm.pdf(x[1], 1, sigma) + g_t * (b_t * norm.pdf(x[1], 1, sigma) + \
+            (1 - b_t) * norm.pdf(x[1], 0, sigma)))
+
+            phi_index = np.where(grid_space == x[0][0])[0]
+            phi_bar_index = np.where(grid_space == x[0][1])[0]
+                
+            start = (phi_index*(size**3))+(phi_bar_index*(size**2))
+            end = start + size**2 
+            np.put(prob_list, np.arange(start, end, 1), np.full(100, prob))
+                                
+    return prob_list
 
 def p_new_ev_switch(x, Phi, sigma, k):
     '''
@@ -79,37 +82,26 @@ def p_new_ev_switch(x, Phi, sigma, k):
     # this is the bit of the equation that captures weights the draws on local post
     # conditioned on target present
     # mostly just for notational convience
-    weight_draw_pres = ((phi_bar * beta_bar) / Z_b) * norm_draw(1, x) + \
-        ((phi * beta_bar + phi_bar * beta + (N - (k - 1)) * phi_bar * beta_bar) / Z_b) * norm_draw(0, x)
+    weight_draw_pres = ((phi_bar * beta_bar) / Z_b) * norm.pdf(x, 1, sigma) + \
+        ((phi * beta_bar + phi_bar * beta + (N - (k - 1)) * phi_bar * beta_bar) / Z_b) * norm.pdf(x, 0, sigma)
 
-    return (1 - g_t) * norm_draw(0, x) + g_t * (weight_draw_pres)
+    return (1 - g_t) * norm.pdf(x, 0, sigma) + g_t * (weight_draw_pres)
 
-def norm_draw(C, x):
-    if C==1:
-        return np.exp(-(x - 1)**2 / (2 * sigma**2))
-    if C==0:
-        return np.exp(-(x)**2 / (2 * sigma**2))
-    else:
-        raise ValueError('C is a binary variable and must take value 0 or 1')
 
 def get_root(C, val_tp1, val_t):
-    try:
-        root_1 = brentq(lambda x: val_tp1 - norm_draw(C, x) * val_t,
+    if val_tp1 > norm.pdf(C, C, sigma)*val_t: 
+        return(150, 150)
+    else: 
+        root_1 = brentq(lambda x: val_tp1 - norm.pdf(x, C, sigma) * val_t,
                                   -150, C)  # root finding
-        root_2 = brentq(lambda x: val_tp1 - norm_draw(C, x) * val_t,
+        root_2 = brentq(lambda x: val_tp1 - norm.pdf(x, C, sigma) * val_t,
                                   C, 150)  # root finding
-    except ValueError:
-        if val_t > val_tp1:
-            root_1 = -150
-            root_2 = -150
-        elif val_t < val_tp1:
-            root_1 = 150
-            root_2 = 150
     return (root_1, root_2)
         #using the root values
 
 def get_close(C, val_t, root):
-    return grid_space[np.abs(grid_space-(norm_draw(C, root)*val_t)).argmin()]
+    return grid_space[np.abs(grid_space-(norm.pdf(root, C, sigma)*val_t)).argmin()]
+
 
 def get_Update_X(Phi_t):
     '''
@@ -125,9 +117,6 @@ def get_Update_X(Phi_t):
     #init_roots = np.full((size**2,4), np.NaN)
     root_dict = {}
     ##phi, phi_bar pairs
-    phi_phi_bar_space = combs(grid_space, 2)
-    for x in phi_phi_bar_space:
-        root_dict[x] = []
 
     for i in range(size):
         #we look at possible values of phi_tp1
@@ -146,29 +135,28 @@ def get_Update_X(Phi_t):
         #based on the aquired phi_bar_tp1, we match the root_1
         # with the proper phi_tp1, phi_bar_tp1 pair
 
-        root_dict[(val_tp1, phi_bar_tp_1)].append(root_1)
-        root_dict[(val_tp1, phi_bar_tp_2)].append(root_2)
-        root_dict[(phi_tp_3, val_tp1)].append(root_3)
-        root_dict[(phi_tp_4, val_tp1)].append(root_4)
+        if (val_tp1, phi_bar_tp_1) in root_dict:
+            root_dict[(val_tp1, phi_bar_tp_1)].append(root_1)
+        else: 
+            root_dict[(val_tp1, phi_bar_tp_1)] = [root_1]
 
-    root_list = list(root_dict.values())
-    full_roots = []
-    for i in range(size**2):
-        cur_root = root_list[i]
-        for j in range (size**2):
-            full_roots.append(cur_root)
+        if (val_tp1, phi_bar_tp_2) in root_dict:
+            root_dict[(val_tp1, phi_bar_tp_2)].append(root_2)
+        else: 
+            root_dict[(val_tp1, phi_bar_tp_2)] = [root_2]
+            
+        if (phi_tp_3, val_tp1) in root_dict: 
+            root_dict[(phi_tp_3, val_tp1)].append(root_3)
+        else: 
+            root_dict[(phi_tp_3, val_tp1)] = [root_3]
 
-    return full_roots
 
-# def root_checker(phi, phi_bar, roots_arr):
-#     checks = np.zeros((size**2,2), dtype = tuple)
-#     for i in range(size**2):
-#         phi_check = norm_draw(1, roots_arr[i,3]) * phi
-#         phi_bar_check = norm_draw(0, roots_arr[i,3]) * phi_bar
-#         checks[i] =  (phi_check, phi_bar_check)
-#
-#     checks = np.c_[roots_arr, checks]
-#     return checks
+        if (phi_tp_4, val_tp1) in root_dict:
+            root_dict[(phi_tp_4, val_tp1)].append(root_4)
+        else:
+            root_dict[(phi_tp_4, val_tp1)] = [root_4]
+
+    return root_dict
 
 
 def main(argvec):
@@ -197,9 +185,9 @@ def main(argvec):
         print(t)
 
         for i in range(size**4):
-            Phi = grid_space[i]
-            roots = get_Update_X(Phi)
-            new_phi_probs = p_new_ev_stay(roots, Phi, sigma, N)
+            Phi = grid_values[i]
+            print(Phi)
+            new_phi_probs = p_new_ev_stay(Phi, sigma, N)
             #new_phi_probs = new_phi_probs / np.sum(new_phi_probs)
             V_stay = np.sum(new_phi_probs * V_base[:, -(index - 1)]) - rho * t
 
