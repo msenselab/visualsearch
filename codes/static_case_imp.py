@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import brentq, minimize
 from itertools import product
 import seaborn as sbn
+import pickle
 
 T = 6
 t_w = 0.5
@@ -22,13 +23,14 @@ def combs(a, r):
     return np.array(list(product(a, repeat=r)))
 
 grid_values = combs(grid_space, 4)
+phi_values =  combs(grid_space, 2)
 
-def global_posterior(Phi_slice, k): 
+def global_posterior(Phi_slice, k):
         phi = Phi_slice[:, 0]
         phi_bar = Phi_slice[:, 1]
         beta = Phi_slice[:, 2]
         beta_bar = Phi_slice[:, 3]
-        
+
         pres_likelihood = 1 / N * ((phi * beta_bar) + (phi_bar * beta) + ((N - k) * (phi_bar * beta_bar)))
         abs_likelihood = phi_bar * beta_bar
         return pres_likelihood/(pres_likelihood + abs_likelihood)
@@ -52,21 +54,21 @@ def p_new_ev_stay(Phi, sigma, k):
     '''
     g_t = global_posterior(np.reshape(np.array(Phi), (1,4)), k)
     b_t = local_posterior(Phi, k)
-    roots = get_Update_X(Phi)
+    roots = global_roots[(Phi[0], Phi[1])]
     prob_list = np.zeros(size**4)
 
-    for x in roots.items(): 
-        if 150 not in x[1]: 
+    for x in roots.items():
+        if 150 not in x[1]:
             prob = np.sum((1 - g_t) * norm.pdf(x[1], 1, sigma) + g_t * (b_t * norm.pdf(x[1], 1, sigma) + \
             (1 - b_t) * norm.pdf(x[1], 0, sigma)))
 
             phi_index = np.where(grid_space == x[0][0])[0]
             phi_bar_index = np.where(grid_space == x[0][1])[0]
-                
+
             start = (phi_index*(size**3))+(phi_bar_index*(size**2))
-            end = start + size**2 
+            end = start + size**2
             np.put(prob_list, np.arange(start, end, 1), np.full(100, prob))
-                                
+
     return prob_list
 
 def p_new_ev_switch(x, Phi, sigma, k):
@@ -89,9 +91,9 @@ def p_new_ev_switch(x, Phi, sigma, k):
 
 
 def get_root(C, val_tp1, val_t):
-    if val_tp1 > norm.pdf(C, C, sigma)*val_t: 
+    if val_tp1 > norm.pdf(C, C, sigma)*val_t:
         return(150, 150)
-    else: 
+    else:
         root_1 = brentq(lambda x: val_tp1 - norm.pdf(x, C, sigma) * val_t,
                                   -150, C)  # root finding
         root_2 = brentq(lambda x: val_tp1 - norm.pdf(x, C, sigma) * val_t,
@@ -103,15 +105,13 @@ def get_close(C, val_t, root):
     return grid_space[np.abs(grid_space-(norm.pdf(root, C, sigma)*val_t)).argmin()]
 
 
-def get_Update_X(Phi_t):
+def get_Update_X(phi_spot):
     '''
-    takes a Phi and returns a size**4 vector of x's that update current Phi to future Phi
+    takes a phi and phi_bar and returns a size**4 vector of x's that update current Phi to future Phi
     it should be noted that updates only apply to the phi's and so the same update vector
     can be used for all Phi with given phi, phi_bar
     '''
-    #the current phi values based on location in the grid
-    phi_t = Phi_t[0]
-    phi_bar_t = Phi_t[1]
+    phi_t, phi_bar_t = phi_spot
     ##An initial matrix of root values to be computed for each potential
     ##phi_tp1 and phi_bar_tp1 pair, later to be expanded for size^4 space
     #init_roots = np.full((size**2,4), np.NaN)
@@ -137,17 +137,17 @@ def get_Update_X(Phi_t):
 
         if (val_tp1, phi_bar_tp_1) in root_dict:
             root_dict[(val_tp1, phi_bar_tp_1)].append(root_1)
-        else: 
+        else:
             root_dict[(val_tp1, phi_bar_tp_1)] = [root_1]
 
         if (val_tp1, phi_bar_tp_2) in root_dict:
             root_dict[(val_tp1, phi_bar_tp_2)].append(root_2)
-        else: 
+        else:
             root_dict[(val_tp1, phi_bar_tp_2)] = [root_2]
-            
-        if (phi_tp_3, val_tp1) in root_dict: 
+
+        if (phi_tp_3, val_tp1) in root_dict:
             root_dict[(phi_tp_3, val_tp1)].append(root_3)
-        else: 
+        else:
             root_dict[(phi_tp_3, val_tp1)] = [root_3]
 
 
@@ -158,6 +158,9 @@ def get_Update_X(Phi_t):
 
     return root_dict
 
+global_roots = {}
+for x in phi_values:
+    global_roots[tuple(x)] = get_Update_X(tuple(x))
 
 def main(argvec):
     dt, sigma, rho, reward, punishment = argvec
@@ -196,8 +199,10 @@ def main(argvec):
             decisions[i, -index] = np.argmax((V_stay,
                                               decision_vals[i, 0], decision_vals[i, 1]))
 
-    V_full = V_base.expand_dims(np.arrange(N), 3)
-    decision_full = decisions.expand_dims(np.arange(N), 3)
+    return V_base, decisions
+
+    #V_full = V_base.expand_dims(np.arrange(N), 3)
+    #decision_full = decisions.expand_dims(np.arange(N), 3)
 
     # backwards induction through items
 '''
