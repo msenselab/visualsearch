@@ -19,8 +19,77 @@ T = 10
 t_w = 0.5
 size = 100
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
+d_map_samples = 2000
+dt = 0.05
+N_array = [8, 12, 16]
+
+# change paths to relative path, so it can be across computers
+datapath = '../data/'
+
+usePandas = True
+
+my_path = r'C:\Users\Alex\github\visualsearch\data'
+
+if usePandas:
+    exp1 = pd.read_csv(my_path + '\exp1.csv', index_col=None)  # read data
+    # .sub is a keyword, change it
+    exp1.rename(columns={'sub': 'subno'}, inplace=True)
 
 
+test_sub_data = exp1.query('subno == 1')
+test_sub_data = test_sub_data.query('dyn == \'Dynamic\'')
+
+def fit_subject(sub_data):
+
+        def sub_likelihood(sigma):
+            return get_likelihood(sub_data, sigma)
+
+    fit_sigma =
+
+get_likelihood(sub_data, sigma):
+        likelihood = 0
+        data_8 = sub_data.query('setsize == 8')
+        data_12 = sub_data.query('setsize == 12')
+        data_16 = tsub_data.query('setsize == 16')
+
+        stats = get_coarse_stats(sigma, d_map_samples)
+        for i in range(len(N_array)): 
+            sim_rt = (get_rt(np.array(stats[i][0][1], [i][1][1]), \
+                np.arry(stats[i][0][0], stats[i][1][0]))
+
+
+
+def d_map(N, epsilons, fine_sigma):
+    return -1*(1/(2*(fine_sigma**2)))+np.log(1/N)+np.log(np.sum(np.exp(epsilons/fine_sigma**2)))
+
+def sample_epsilon(C, N, fine_sigma):
+    epsilons = np.random.normal(0, fine_sigma, N)
+    if C == 1:
+        epsilons[0] = np.random.normal(1, fine_sigma)
+    return epsilons
+
+def get_coarse_stats(fine_sigma, num_samples):
+    '''
+    returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats
+    row 1 is the mean and row 2 is the sd
+    '''
+    stats = np.zeros((len(N_array), 2,2))
+    for i in range(len(N_array)):
+        N = N_array[i]
+        pres_samples = []
+        abs_samples = []
+        for i in range(num_samples):
+            pres_samples.append(d_map(N, sample_epsilon(1, N, fine_sigma), fine_sigma))
+            abs_samples.append(d_map(N, sample_epsilon(0, N, fine_sigma), fine_sigma))
+
+        print(np.mean(pres_samples))
+
+        stats[i][0][0] = np.mean(abs_samples)
+        stats[i][0][1] = np.sqrt(np.var(abs_samples))
+        stats[i][1][0] = np.mean(pres_samples)
+        stats[i][1][1] = np.sqrt(np.var(pres_samples))
+
+    return stats
 
 def f(x, g_t, sigma, mu):
     ''' x_(t + 1) is x
@@ -141,7 +210,8 @@ def back_induct(reward, sigma, mu):
                                                   decision_vals[i, 0], decision_vals[i, 1]))
     return V_full, decisions
 
-def get_rt(decisions, sigma, mu, dt):
+def get_rt(sigma, mu):
+    decisions = back_induct(1, sigma, mu)[1]
     numsims = 2000
     # pool = mulpro.Pool(processes=mulpro.cpu_count())
     C_vals = [0] * numsims
@@ -157,14 +227,16 @@ def get_rt(decisions, sigma, mu, dt):
     return response_times
 
 
-def get_likelihood(data, param, sim_rt):
-    pres_response_rts =
-    abs_response_rts =
-    sim_rt_dist = gaussian_kde(sim_rt)
+def get_likelihood_N(data, sim_rt):
+    pres_rts = np.array(data.query('target == \'Present\'')['rt'])
+    abs_response_rts = np.array(data.query('target == \'Absent\'')['rt'])
+    pres_sim_rt_dist = gaussian_kde(pres_rt)
+    abs_sim_rt_dist = gaussian_kde(abs_rt)
     p_like_pres = sim_rt_dist.pdf(pres_response_rts)
     p_like_abs = sim_rt_dist.pdf(abs_response_rts)
     p_like = (1-lapse)*p_like_pres+(lapse/2)*exp(-r/temp) + (1-lapse)*p_like_abs+(lapse/2)*exp(-r/temp)
-    return -np.sum(np.log(p_like)) 
+    return -np.sum(np.log(p_like))
+
 
 def main(dt, sigma, mu, rho, reward, punishment):
     # First we find the roots of f(x) for all values of g_t and g_(t+1)
