@@ -11,9 +11,19 @@ import seaborn as sns
 import time
 from scipy.optimize import brentq
 from scipy.stats import gaussian_kde
+from scipy.stats import norm
 from matplotlib.animation import FuncAnimation
 import pickle
 import os
+import pandas as pd
+from pathlib import Path
+import GPy
+import GPyOpt
+from numpy.random import seed
+import matplotlib
+
+# Returns a path object that works as a string for most functions
+datapath = Path("../data/exp1.csv")
 
 T = 10
 t_w = 0.5
@@ -22,45 +32,60 @@ g_values = np.linspace(1e-3, 1 - 1e-3, size)
 d_map_samples = 2000
 dt = 0.05
 N_array = [8, 12, 16]
+lapse = 0.001
+
 
 # change paths to relative path, so it can be across computers
-datapath = '../data/'
 
-usePandas = True
+exp1 = pd.read_csv(datapath, index_col=None)  # read data
+# .sub is a keyword, change it
+exp1.rename(columns={'sub': 'subno'}, inplace=True)
 
-my_path = r'C:\Users\Alex\github\visualsearch\data'
+temp = np.mean(np.array(exp1['rt']))
 
-if usePandas:
-    exp1 = pd.read_csv(my_path + '\exp1.csv', index_col=None)  # read data
-    # .sub is a keyword, change it
-    exp1.rename(columns={'sub': 'subno'}, inplace=True)
+sub_data = exp1.query('subno == 1 & dyn == \'Dynamic\'')
 
-
-test_sub_data = exp1.query('subno == 1')
-test_sub_data = test_sub_data.query('dyn == \'Dynamic\'')
-
+#where sub data is all data from givne subject under dynamic condition
 def fit_subject(sub_data):
 
-        def sub_likelihood(sigma):
-            return get_likelihood(sub_data, sigma)
+    def subject_likelihood(sigma):
+        return get_likelihood(sub_data, sigma)
 
-    fit_sigma =
+    bounds = [{'name': 'sigma', 'type': 'continuous', 'domain': (0, 10)}]
+    max_iter = 1
+    
+    opt_prob = GPyOpt.methods.BayesianOptimization(f = subject_likelihood, 
+                                                    domain = bounds,
+                                                    acquisition_type = 'EI',
+                                                    model_type = 'GP_MCMC')
+    opt_prob.run_optimization(max_iter)
 
-get_likelihood(sub_data, sigma):
+    return opt_prob.x_opt
+
+def get_likelihood(sub_data, sigma):
+        sigma = sigma[0][0]
+        print(sigma)
         likelihood = 0
-        data_8 = sub_data.query('setsize == 8')
-        data_12 = sub_data.query('setsize == 12')
-        data_16 = tsub_data.query('setsize == 16')
+        data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'), \
+            sub_data.query('setsize == 16')]
 
         stats = get_coarse_stats(sigma, d_map_samples)
-        for i in range(len(N_array)): 
-            sim_rt = (get_rt(np.array(stats[i][0][1], [i][1][1]), \
-                np.arry(stats[i][0][0], stats[i][1][0]))
+        print(stats)
 
+        for i in range(stats.shape[0]):
+            mu = [stats[i][0][0], stats[i][1][0]]
+            sigma = [stats[i][0][1], stats[i][1][1]]
+            rootgrid = get_rootgrid(sigma, mu)
+            decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)
+            sim_rt = get_rt(sigma, mu, decisions[1])
+            likelihood =+ get_likelihood_N(data[i], sim_rt, 1)
+
+        return likelihood
 
 
 def d_map(N, epsilons, fine_sigma):
-    return -1*(1/(2*(fine_sigma**2)))+np.log(1/N)+np.log(np.sum(np.exp(epsilons/fine_sigma**2)))
+    return -(1 / (2 * fine_sigma**2)) + np.log(1 / N) + \
+        np.log(np.sum(np.exp(epsilons / fine_sigma**2)))
 
 def sample_epsilon(C, N, fine_sigma):
     epsilons = np.random.normal(0, fine_sigma, N)
@@ -76,19 +101,14 @@ def get_coarse_stats(fine_sigma, num_samples):
     stats = np.zeros((len(N_array), 2,2))
     for i in range(len(N_array)):
         N = N_array[i]
-        pres_samples = []
-        abs_samples = []
-        for i in range(num_samples):
-            pres_samples.append(d_map(N, sample_epsilon(1, N, fine_sigma), fine_sigma))
-            abs_samples.append(d_map(N, sample_epsilon(0, N, fine_sigma), fine_sigma))
+        pres_samples = np.zeros(num_samples)
+        abs_samples = np.zeros(num_samples)
+        for j in range(num_samples):
+            pres_samples[j] = d_map(N, sample_epsilon(1, N, fine_sigma), fine_sigma)
+            abs_samples[j] = d_map(N, sample_epsilon(0, N, fine_sigma), fine_sigma)
 
-        print(np.mean(pres_samples))
-
-        stats[i][0][0] = np.mean(abs_samples)
-        stats[i][0][1] = np.sqrt(np.var(abs_samples))
-        stats[i][1][0] = np.mean(pres_samples)
-        stats[i][1][1] = np.sqrt(np.var(pres_samples))
-
+        stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
+                             [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
     return stats
 
 def f(x, g_t, sigma, mu):
@@ -157,15 +177,15 @@ def get_rootgrid(sigma, mu):
                 rootgrid[i, j, 1] = brentq(
                     lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 150)
             except ValueError:
-                if g_t > g_tp1:
+                if g_t >= g_tp1:
                     rootgrid[i, j, 0] = -150
                     rootgrid[i, j, 1] = -150
                 elif g_t < g_tp1:
                     rootgrid[i, j, 0] = 150
                     rootgrid[i, j, 1] = 150
-        return rootgrid
+    return rootgrid
 
-def back_induct(reward, sigma, mu):
+def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
     R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
                       (punishment, reward)])  # (pres/abs, pres/pres) in form decision / actual
 
@@ -173,10 +193,8 @@ def back_induct(reward, sigma, mu):
     # in advance
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
-    decision_vals[:, 1] = g_values * R[1, 1] + \
-        (1 - g_values) * R[1, 0]  # respond present
-    decision_vals[:, 0] = (1 - g_values) * R[0, 0] + \
-        g_values * R[0, 1]  # respond absent
+    decision_vals[:, 1] = g_values * R[1, 1] + (1 - g_values) * R[1, 0]  # respond present
+    decision_vals[:, 0] = (1 - g_values) * R[0, 0] + g_values * R[0, 1]  # respond absent
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
@@ -190,7 +208,6 @@ def back_induct(reward, sigma, mu):
     for index in range(2, int(T / dt) + 1):
         tau = (index - 1) * dt
         t = T - tau
-            # print(t)
 
         for i in range(size):
             g_t = g_values[i]  # Pick ith value of g at t
@@ -210,8 +227,7 @@ def back_induct(reward, sigma, mu):
                                                   decision_vals[i, 0], decision_vals[i, 1]))
     return V_full, decisions
 
-def get_rt(sigma, mu):
-    decisions = back_induct(1, sigma, mu)[1]
+def get_rt(sigma, mu, decisions):
     numsims = 2000
     # pool = mulpro.Pool(processes=mulpro.cpu_count())
     C_vals = [0] * numsims
@@ -222,50 +238,45 @@ def get_rt(sigma, mu):
     observer_outputs = []
     for arglist in arglists:
         observer_outputs.append(simulate_observer(arglist))
-    g_grid = np.array([x[2] for x in observer_outputs])
+    #g_grid = np.array([x[2] for x in observer_outputs])
     response_times = np.array([x[1] for x in observer_outputs])
-    return response_times
+    return response_times.reshape(2, numsims)
 
 
-def get_likelihood_N(data, sim_rt):
-    pres_rts = np.array(data.query('target == \'Present\'')['rt'])
-    abs_response_rts = np.array(data.query('target == \'Absent\'')['rt'])
-    pres_sim_rt_dist = gaussian_kde(pres_rt)
-    abs_sim_rt_dist = gaussian_kde(abs_rt)
-    p_like_pres = sim_rt_dist.pdf(pres_response_rts)
-    p_like_abs = sim_rt_dist.pdf(abs_response_rts)
-    p_like = (1-lapse)*p_like_pres+(lapse/2)*exp(-r/temp) + (1-lapse)*p_like_abs+(lapse/2)*exp(-r/temp)
+def get_likelihood_N(data, sim_rt, reward):
+    pres_rts_0 = np.array(data.query('resp == 2 & target == \'Present\'')['rt'])
+    pres_rts_1 = np.array(data.query('resp == 1 & target == \'Present\'')['rt'])
+
+    abs_rts_0 = np.array(data.query('resp == 2 & target == \'Absent\'')['rt'])
+    abs_rts_1 = np.array(data.query('resp == 1 & target == \'Absent\'')['rt'])
+
+    #deal with the cases where sim rt are all the same giving 0 var to KDE
+    if np.var(sim_rt[1,:]) == 0: 
+        mean = np.mean(sim_rt[1,:])
+        perturb = np.random.normal(mean, 0.1)
+        sim_rt[1][0] = mean + perturb
+
+    pres_sim_rt_dist = gaussian_kde(sim_rt[1,:])
+        
+    if np.var(sim_rt[0,:]) == 0: 
+        mean = np.mean(sim_rt[0,:])
+        perturb = np.random.normal(mean, 0.1)
+        sim_rt[0][0] = mean + perturb
+    
+    abs_sim_rt_dist = gaussian_kde(sim_rt[0,:])
+
+    p_like_pres = len(pres_rts_0)/(len(pres_rts_0)+len(pres_rts_1)) * np.sum(pres_sim_rt_dist.pdf(pres_rts_0)) + \
+                            len(pres_rts_1)/(len(pres_rts_0)+len(pres_rts_1)) * np.sum(pres_sim_rt_dist.pdf(pres_rts_1))
+
+    p_like_abs = len(abs_rts_0)/(len(abs_rts_0)+len(abs_rts_1)) * np.sum(abs_sim_rt_dist.pdf(abs_rts_0)) + \
+                            len(abs_rts_1)/(len(abs_rts_0)+len(abs_rts_1)) * np.sum(abs_sim_rt_dist.pdf(abs_rts_1))
+    print(sim_rt[0, :])
+    print(np.mean(sim_rt[0, :]))
+    print(p_like_abs)
+    print(sim_rt[1, :])
+    print(np.mean(sim_rt[0, :]))
+    print(p_like_pres)
+
+    p_like = (1-lapse)*p_like_pres+(lapse/2)*np.exp(-reward/temp) + (1-lapse)*p_like_abs+(lapse/2)*np.exp(-reward/temp)
     return -np.sum(np.log(p_like))
 
-
-def main(dt, sigma, mu, rho, reward, punishment):
-    # First we find the roots of f(x) for all values of g_t and g_(t+1)
-
-    # Define the reward array
-
-
-
-    # Simulate a pool of observers
-
-
-if __name__ == '__main__':
-    rho = 0.05
-    punishment = -.1
-    dt = 0.01
-    mu = np.array([0, 1])
-    multiple_trials = {}
-    sigmas = np.linspace(0.9, 15, 10)
-    raw_pairs = list(it.product(sigmas, sigmas))
-    sigma_list = [x for x in raw_pairs if x[0] != x[1]]
-    for sigma in sigma_list:
-        _, multiple_trials[sigma] = main(dt, np.array(sigma), mu, rho, reward, punishment)
-
-    currtime = time.localtime()
-    filename = os.getenv("HOME") + '/Documents/two_sigma_search_{}_{}_{}'.format(currtime.tm_mday,
-                                                                                 currtime.tm_mon,
-                                                                                 currtime.tm_year)
-    fw = open(filename + '.p', 'wb')
-    outdict = {'trials_dict': multiple_trials, 'T': T, 'dt': dt, 't_w': t_w, 'size': size,
-               'g_values': g_values, 'rho': rho, 'reward': reward, 'punishment': punishment}
-    pickle.dump(outdict, fw)
-    fw.close()
