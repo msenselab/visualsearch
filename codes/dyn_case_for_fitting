@@ -10,6 +10,8 @@ import itertools as it
 import seaborn as sns
 import time
 from scipy.optimize import brentq
+from scipy.optimize import minimize
+from scipy.optimize import Bounds
 from scipy.stats import gaussian_kde
 from scipy.stats import norm
 from matplotlib.animation import FuncAnimation
@@ -48,19 +50,25 @@ sub_data = exp1.query('subno == 1 & dyn == \'Dynamic\'')
 #where sub data is all data from givne subject under dynamic condition
 def fit_subject(sub_data):
 
+    use_BO = False
     def subject_likelihood(sigma):
         return get_likelihood(sub_data, sigma)
 
-    bounds = [{'name': 'sigma', 'type': 'continuous', 'domain': (0, 10)}]
-    max_iter = 1
-    
-    opt_prob = GPyOpt.methods.BayesianOptimization(f = subject_likelihood, 
-                                                    domain = bounds,
-                                                    acquisition_type = 'EI',
-                                                    model_type = 'GP_MCMC')
-    opt_prob.run_optimization(max_iter)
+    if use_BO:
+        bounds = [{'name': 'sigma', 'type': 'continuous', 'domain': (0, 10)}]
+        max_iter = 1
 
-    return opt_prob.x_opt
+        opt_prob = GPyOpt.methods.BayesianOptimization(f = subject_likelihood,
+                                                        domain = bounds,
+                                                        acquisition_type = 'EI',
+                                                        model_type = 'GP_MCMC')
+        opt_prob.run_optimization(max_iter)
+
+        return opt_prob.x_opt
+
+    bounds = (0, 7)
+    x_opt = minimize(subject_likelihood, 1, method = 'SLSQP', bounds = bounds)
+    return x_opt
 
 def get_likelihood(sub_data, sigma):
         sigma = sigma[0][0]
@@ -251,18 +259,18 @@ def get_likelihood_N(data, sim_rt, reward):
     abs_rts_1 = np.array(data.query('resp == 1 & target == \'Absent\'')['rt'])
 
     #deal with the cases where sim rt are all the same giving 0 var to KDE
-    if np.var(sim_rt[1,:]) == 0: 
+    if np.var(sim_rt[1,:]) == 0:
         mean = np.mean(sim_rt[1,:])
         perturb = np.random.normal(mean, 0.1)
         sim_rt[1][0] = mean + perturb
 
     pres_sim_rt_dist = gaussian_kde(sim_rt[1,:])
-        
-    if np.var(sim_rt[0,:]) == 0: 
+
+    if np.var(sim_rt[0,:]) == 0:
         mean = np.mean(sim_rt[0,:])
         perturb = np.random.normal(mean, 0.1)
         sim_rt[0][0] = mean + perturb
-    
+
     abs_sim_rt_dist = gaussian_kde(sim_rt[0,:])
 
     p_like_pres = len(pres_rts_0)/(len(pres_rts_0)+len(pres_rts_1)) * np.sum(pres_sim_rt_dist.pdf(pres_rts_0)) + \
@@ -273,8 +281,9 @@ def get_likelihood_N(data, sim_rt, reward):
     print(sim_rt[0, :])
     print(np.mean(sim_rt[0, :]))
     print(p_like_abs)
+
     print(sim_rt[1, :])
-    print(np.mean(sim_rt[0, :]))
+    print(np.mean(sim_rt[1, :]))
     print(p_like_pres)
 
     p_like = (1-lapse)*p_like_pres+(lapse/2)*np.exp(-reward/temp) + (1-lapse)*p_like_abs+(lapse/2)*np.exp(-reward/temp)
