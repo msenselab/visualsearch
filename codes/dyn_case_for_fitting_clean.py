@@ -11,8 +11,8 @@ from scipy.optimize import minimize
 from scipy.stats import gaussian_kde
 import pandas as pd
 from pathlib import Path
-import GPy
-import GPyOpt
+from gauss_opt import bayesian_optimisation
+from dynamic_adhoc_twosigma import f, p_new_ev, posterior
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -26,63 +26,11 @@ dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
 
-
-# change paths to relative path, so it can be across computers
-
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
-# .sub is a keyword, change it
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
 
 temp = np.mean(np.array(exp1['rt']))
-
 sub_data = exp1.query('subno == 1 & dyn == \'Dynamic\'')
-
-# where sub data is all data from givne subject under dynamic condition
-
-
-def fit_subject(sub_data):
-
-    use_BO = False
-
-    def subject_likelihood(sigma):
-        return get_likelihood(sub_data, sigma)
-
-    if use_BO:
-        bounds = [{'name': 'sigma', 'type': 'continuous', 'domain': (0, 10)}]
-        max_iter = 1
-
-        opt_prob = GPyOpt.methods.BayesianOptimization(f=subject_likelihood,
-                                                       domain=bounds,
-                                                       acquisition_type='EI',
-                                                       model_type='GP_MCMC')
-        opt_prob.run_optimization(max_iter)
-
-        return opt_prob.x_opt
-
-    bounds = (0, 10)
-    x_opt = minimize(subject_likelihood, 1, method='SLSQP', bounds=bounds)
-    return x_opt
-
-
-def get_likelihood(sub_data, sigma):
-    sigma = sigma
-    print(sigma)
-    likelihood = 0
-    data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
-            sub_data.query('setsize == 16')]
-
-    stats = get_coarse_stats(sigma, d_map_samples)
-    print(stats)
-
-    for i in range(stats.shape[0]):
-        mu = [stats[i][0][0], stats[i][1][0]]
-        sigma = [stats[i][0][1], stats[i][1][1]]
-        rootgrid = get_rootgrid(sigma, mu)
-        decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)
-        sim_rt = get_rt(sigma, mu, decisions[1])
-        likelihood = + get_likelihood_N(data[i], sim_rt, 1)
-
-    return likelihood
 
 
 def d_map(N, epsilons, fine_sigma):
@@ -114,39 +62,6 @@ def get_coarse_stats(fine_sigma, num_samples):
         stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
                              [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
     return stats
-
-
-def f(x, g_t, sigma, mu):
-    ''' x_(t + 1) is x
-    Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
-    the appropriate g_(t+1) as an output for a single value of x_(t+1)
-    '''
-    p_given_true = (g_t * np.exp(- (x - mu[1])**2 / (2 * sigma[1]**2)))
-    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- (x - mu[0])**2 / (2 * sigma[0]**2)))
-
-
-def p_new_ev(x, g_t, sigma, mu):
-    ''' The probability of a given observation x_(t+1) given our current belief
-    g_t'''
-    p_pres = np.exp(- (x - mu[1])**2 /
-                    (2 * sigma[1]**2)) / np.sqrt(2 * np.pi * sigma[1]**2)
-    p_abs = np.exp(- (x - mu[0])**2 / (2 * sigma[0]**2)) / \
-        np.sqrt(2 * np.pi * sigma[0]**2)
-    return p_pres * g_t + p_abs * (1 - g_t)
-
-
-def posterior(x, g_t, C, sigma, mu):
-    ''' x_(t + 1) is x
-    Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
-    the appropriate g_(t+1) as an output for a single value of x_(t+1)
-    '''
-    p_given_true = (g_t * np.exp(- (x - mu[C])**2 / (2 * sigma[C]**2)))
-    if C == 1:
-        othmean = 0
-    elif C == 0:
-        othmean = 1
-    return p_given_true / (p_given_true +
-                           (1 - g_t) * np.exp(- (x - mu[othmean])**2 / (2 * sigma[othmean]**2)))
 
 
 def simulate_observer(arglist):
@@ -246,47 +161,86 @@ def get_rt(sigma, mu, decisions):
     observer_outputs = []
     for arglist in arglists:
         observer_outputs.append(simulate_observer(arglist))
-    #g_grid = np.array([x[2] for x in observer_outputs])
     response_times = np.array([x[1] for x in observer_outputs])
     return response_times.reshape(2, numsims)
 
 
 def get_likelihood_N(data, sim_rt, reward):
-    pres_rts_0 = np.array(data.query('resp == 2 & target == \'Present\'')['rt'])
-    pres_rts_1 = np.array(data.query('resp == 1 & target == \'Present\'')['rt'])
 
-    abs_rts_0 = np.array(data.query('resp == 2 & target == \'Absent\'')['rt'])
-    abs_rts_1 = np.array(data.query('resp == 1 & target == \'Absent\'')['rt'])
+    pres_rts_0 = data.query('resp == 2 & target == \'Present\'').rt.values
+    pres_rts_1 = data.query('resp == 1 & target == \'Present\'').rt.values
+
+    abs_rts_0 = data.query('resp == 2 & target == \'Absent\'').rt.values
+    abs_rts_1 = data.query('resp == 1 & target == \'Absent\'').rt.values
 
     # deal with the cases where sim rt are all the same giving 0 var to KDE
     if np.var(sim_rt[1, :]) == 0:
         mean = np.mean(sim_rt[1, :])
-        perturb = np.random.normal(mean, 0.1)
-        sim_rt[1][0] = mean + perturb
+        perturb = np.random.normal(mean, 0.01)
+        sim_rt[1, 0] = mean + perturb
 
-    pres_sim_rt_dist = gaussian_kde(sim_rt[1, :])
+    pres_sim_rt_dist = gaussian_kde(sim_rt[1, :], bw_method=0.1)
 
     if np.var(sim_rt[0, :]) == 0:
         mean = np.mean(sim_rt[0, :])
         perturb = np.random.normal(mean, 0.1)
-        sim_rt[0][0] = mean + perturb
+        sim_rt[0, 0] = mean + perturb
 
-    abs_sim_rt_dist = gaussian_kde(sim_rt[0, :])
+    abs_sim_rt_dist = gaussian_kde(sim_rt[0, :], bw_method=0.1)
 
-    p_like_pres = len(pres_rts_0) / (len(pres_rts_0) + len(pres_rts_1)) * np.sum(pres_sim_rt_dist.pdf(pres_rts_0)) + \
-        len(pres_rts_1) / (len(pres_rts_0) + len(pres_rts_1)) * \
-        np.sum(pres_sim_rt_dist.pdf(pres_rts_1))
+    frac_pres_inc = len(pres_rts_0) / (len(pres_rts_0) + len(pres_rts_1))
+    frac_pres_corr = len(pres_rts_1) / (len(pres_rts_0) + len(pres_rts_1))
+    p_like_pres = (frac_pres_inc * np.sum(pres_sim_rt_dist.pdf(pres_rts_0)) +
+                   frac_pres_corr * np.sum(pres_sim_rt_dist.pdf(pres_rts_1)))
 
-    p_like_abs = len(abs_rts_0) / (len(abs_rts_0) + len(abs_rts_1)) * np.sum(abs_sim_rt_dist.pdf(abs_rts_0)) + \
-        len(abs_rts_1) / (len(abs_rts_0) + len(abs_rts_1)) * np.sum(abs_sim_rt_dist.pdf(abs_rts_1))
-    print(sim_rt[0, :])
-    print(np.mean(sim_rt[0, :]))
-    print(p_like_abs)
+    frac_abs_inc = len(abs_rts_1) / (len(abs_rts_0) + len(abs_rts_1))
+    frac_abs_corr = len(abs_rts_0) / (len(abs_rts_0) + len(abs_rts_1))
+    p_like_abs = (frac_abs_corr * np.sum(abs_sim_rt_dist.pdf(abs_rts_0)) +
+                  frac_abs_inc * np.sum(abs_sim_rt_dist.pdf(abs_rts_1)))
 
-    print(sim_rt[1, :])
-    print(np.mean(sim_rt[1, :]))
-    print(p_like_pres)
+    # print(sim_rt[0, :])
+    # print(np.mean(sim_rt[0, :]))
+    # print(p_like_abs)
+    #
+    # print(sim_rt[1, :])
+    # print(np.mean(sim_rt[1, :]))
+    # print(p_like_pres)
 
     p_like = (1 - lapse) * p_like_pres + (lapse / 2) * np.exp(-reward / temp) + \
         (1 - lapse) * p_like_abs + (lapse / 2) * np.exp(-reward / temp)
     return -np.sum(np.log(p_like))
+
+
+def get_likelihood(sub_data, sigma):
+    sigma = np.exp(sigma)
+    print(sigma)
+    likelihood = 0
+    data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
+            sub_data.query('setsize == 16')]
+
+    stats = get_coarse_stats(sigma, d_map_samples)
+    # print(stats)
+
+    for i in range(stats.shape[0]):
+        mu = stats[i, :, 0]
+        sigma = stats[i, :, 1]
+        rootgrid = get_rootgrid(sigma, mu)
+        decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)[1]
+        sim_rt = get_rt(sigma, mu, decisions)
+        likelihood += get_likelihood_N(data[i], sim_rt, 1)
+
+    return likelihood
+
+
+if __name__ == '__main__':
+    use_BO = False
+
+    def subject_likelihood(sigma):
+        return get_likelihood(sub_data, sigma)
+
+    if use_BO:
+        bnds = np.array(((-2, 2),))  # [n_samples, 2] shaped array with bounds
+        x_opt = bayesian_optimisation(n_iters=50, sample_loss=subject_likelihood,
+                                      bounds=bnds, n_pre_samples=10)
+
+    x_opt = minimize(subject_likelihood, 1, method='SLSQP', bounds=((1e-4, 1),))
