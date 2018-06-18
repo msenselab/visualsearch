@@ -165,7 +165,7 @@ def get_rt(sigma, mu, decisions):
     return response_times.reshape(2, numsims)
 
 
-def get_likelihood_N(data, sim_rt, reward):
+def get_single_N_likelihood(data, sim_rt, reward):
 
     pres_rts_0 = data.query('resp == 2 & target == \'Present\'').rt.values
     pres_rts_1 = data.query('resp == 1 & target == \'Present\'').rt.values
@@ -208,10 +208,10 @@ def get_likelihood_N(data, sim_rt, reward):
 
     p_like = (1 - lapse) * p_like_pres + (lapse / 2) * np.exp(-reward / temp) + \
         (1 - lapse) * p_like_abs + (lapse / 2) * np.exp(-reward / temp)
-    return p_like
+    return - np.log(p_like)
 
 
-def get_likelihood(sub_data, sigma):
+def get_data_likelihood(sub_data, sigma):
     sigma = np.exp(sigma)
     print(sigma)
     likelihood = 0
@@ -227,16 +227,16 @@ def get_likelihood(sub_data, sigma):
         rootgrid = get_rootgrid(sigma, mu)
         decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        likelihood += get_likelihood_N(data[i], sim_rt, 1)
+        likelihood += get_single_N_likelihood(data[i], sim_rt, 1)
 
-    return -np.log(likelihood)
+    return likelihood
 
 
 if __name__ == '__main__':
     use_BO = False
 
     def subject_likelihood(sigma):
-        return get_likelihood(sub_data, sigma)
+        return get_data_likelihood(sub_data, sigma)
 
     if use_BO:
         bnds = np.array(((-2, 2),))  # [n_samples, 2] shaped array with bounds
