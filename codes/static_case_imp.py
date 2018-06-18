@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq, minimize
-from itertools import product
+import itertools as it
 import seaborn as sbn
 import pickle
 
@@ -21,7 +21,7 @@ def combs(a, r):
     """
     Return successive r-length cartesian product of values in a...
     """
-    return np.array(list(product(a, repeat=r)))
+    return np.array(list(it.product(a, repeat=r)))
 
 
 grid_values = combs(grid_space, 4)
