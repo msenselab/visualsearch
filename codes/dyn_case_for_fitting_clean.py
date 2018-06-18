@@ -208,7 +208,7 @@ def get_likelihood_N(data, sim_rt, reward):
 
     p_like = (1 - lapse) * p_like_pres + (lapse / 2) * np.exp(-reward / temp) + \
         (1 - lapse) * p_like_abs + (lapse / 2) * np.exp(-reward / temp)
-    return -np.sum(np.log(p_like))
+    return p_like
 
 
 def get_likelihood(sub_data, sigma):
@@ -229,7 +229,7 @@ def get_likelihood(sub_data, sigma):
         sim_rt = get_rt(sigma, mu, decisions)
         likelihood += get_likelihood_N(data[i], sim_rt, 1)
 
-    return likelihood
+    return -np.log(likelihood)
 
 
 if __name__ == '__main__':
