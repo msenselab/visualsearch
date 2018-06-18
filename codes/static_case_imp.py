@@ -172,6 +172,37 @@ global_roots = {}
 for x in phi_values:
     global_roots[tuple(x)] = get_Update_X(tuple(x))
 
+def get_rt(sigma, mu, decisions):
+    numsims = 2000
+    # pool = mulpro.Pool(processes=mulpro.cpu_count())
+    C_vals = [0] * numsims
+    C_vals.extend([1] * numsims)
+    arglists = it.product(C_vals, [decisions], [sigma], [mu], [dt])
+    # observer_outputs = pool.map(simulate_observer, arglists)
+    # pool.close()
+    observer_outputs = []
+    for arglist in arglists:
+        observer_outputs.append(simulate_observer(arglist))
+    #g_grid = np.array([x[2] for x in observer_outputs])
+    response_times = np.array([x[1] for x in observer_outputs])
+    return response_times.reshape(2, numsims)
+
+def simulate_observer(arglist):
+    C, decisions, sigma, mu, dt = arglist
+    step = 0
+    t = 0
+    g_t = np.ones(int(T / dt)) * 0.5
+    while t < (T - dt):
+        step += 1
+        t = step * dt
+        x_t = np.random.normal(mu[C], sigma[C]) * dt
+        g_t[step] = posterior(x_t, g_t[step - 1], C, sigma, mu)
+        nearest_grid = np.abs(g_values - g_t[step]).argmin()
+        decision_t = decisions[nearest_grid, step]
+        if decision_t != 0:
+            break
+    return (decision_t, t, g_t)
+
 
 def main(argvec):
     dt, sigma, rho, reward, punishment = argvec
@@ -216,7 +247,7 @@ def main(argvec):
     # decision_full = decisions.expand_dims(np.arange(N), 3)
     #
     # # backwards induction through items
-    # 
+    #
     # for index in range(1, N):
     #     V_item = V_full[:, :, N - index]
     #     decision_item = decision_full[:, :, N - index]

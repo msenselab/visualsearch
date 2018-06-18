@@ -32,20 +32,19 @@ def sample_epsilon(C, N, fine_sigma):
 
 def get_coarse_stats(N, fine_sigma, num_samples):
     '''
-    returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats 
-    row 1 is the mean and row 2 is the sd 
+    returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats
+    row 1 is the mean and row 2 is the sd
     '''
-    returns 
     stats = np.zeros((2,2))
     pres_samples = []
     abs_samples = []
-    for i in range(num_samples): 
+    for i in range(num_samples):
         pres_samples.append(d_map(N, sample_epsilon(1, N, fine_sigma), fine_sigma))
         abs_samples.append(d_map(N, sample_epsilon(0, N, fine_sigma), fine_sigma))
 
-    stats[0][0] = np.mean(abs_samples) 
+    stats[0][0] = np.mean(abs_samples)
     stats[0][1] = np.sqrt(np.var(abs_samples))
-    stats[1][0] = np.mean(pres_samples) 
+    stats[1][0] = np.mean(pres_samples)
     stats[1][1] = np.sqrt(np.var(pres_samples))
 
     return stats
@@ -172,12 +171,15 @@ def main(dt, sigma, mu, rho, reward, punishment):
 
     # Simulate a pool of observers
     numsims = 2000
-    pool = mulpro.Pool(processes=8)
+    # pool = mulpro.Pool(processes=mulpro.cpu_count())
     C_vals = [0] * numsims
     C_vals.extend([1] * numsims)
     arglists = it.product(C_vals, [decisions], [sigma], [mu], [dt])
-    observer_outputs = pool.map(simulate_observer, arglists)
-    pool.close()
+    # observer_outputs = pool.map(simulate_observer, arglists)
+    # pool.close()
+    observer_outputs = []
+    for arglist in arglists:
+        observer_outputs.append(simulate_observer(arglist))
     g_grid = np.array([x[2] for x in observer_outputs])
     response_times = np.array([x[1] for x in observer_outputs])
     return g_grid, response_times, decisions
