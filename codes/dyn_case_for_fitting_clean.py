@@ -200,9 +200,9 @@ def get_single_N_likelihood(data, sim_rt, reward):
 
     frac_abs_inc = len(abs_rts_1) / (len(abs_rts_0) + len(abs_rts_1))
     frac_abs_corr = len(abs_rts_0) / (len(abs_rts_0) + len(abs_rts_1))
-    log_like_abs = np.concatenate((np.log(frac_abs_inc) +
+    log_like_abs = np.concatenate((np.log(frac_abs_corr) +
                                    np.log(abs_sim_rt_dist.pdf(abs_rts_0)),
-                                   np.log(frac_abs_corr) +
+                                   np.log(frac_abs_inc) +
                                    np.log(abs_sim_rt_dist.pdf(abs_rts_1))))
 
     log_like_all = np.concatenate((log_like_pres, log_like_abs))
