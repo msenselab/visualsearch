@@ -16,16 +16,18 @@ from dynamic_adhoc_twosigma import f, p_new_ev, posterior
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
+savepath = Path("~/Documents/")  # Where to save figures
+savepath = str(savepath.expanduser())
 
 T = 10
 t_w = 0.5
 size = 100
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
-d_map_samples = 2000
+d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
-subject_num = 1
+subject_num = 4
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
@@ -191,58 +193,29 @@ def get_single_N_likelihood(data, sim_rt, reward):
 
     frac_pres_inc = len(pres_rts_0) / (len(pres_rts_0) + len(pres_rts_1))
     frac_pres_corr = len(pres_rts_1) / (len(pres_rts_0) + len(pres_rts_1))
-    p_like_pres = (frac_pres_inc * np.sum(pres_sim_rt_dist.pdf(pres_rts_0)) +
-                   frac_pres_corr * np.sum(pres_sim_rt_dist.pdf(pres_rts_1)))
+    log_like_pres = np.concatenate((np.log(frac_pres_inc) +
+                                    np.log(pres_sim_rt_dist.pdf(pres_rts_0)),
+                                    np.log(frac_pres_corr) +
+                                    np.log(pres_sim_rt_dist.pdf(pres_rts_1))))
 
     frac_abs_inc = len(abs_rts_1) / (len(abs_rts_0) + len(abs_rts_1))
     frac_abs_corr = len(abs_rts_0) / (len(abs_rts_0) + len(abs_rts_1))
-    p_like_abs = (frac_abs_corr * np.sum(abs_sim_rt_dist.pdf(abs_rts_0)) +
-                  frac_abs_inc * np.sum(abs_sim_rt_dist.pdf(abs_rts_1)))
+    log_like_abs = np.concatenate((np.log(frac_abs_inc) +
+                                   np.log(abs_sim_rt_dist.pdf(abs_rts_0)),
+                                   np.log(frac_abs_corr) +
+                                   np.log(abs_sim_rt_dist.pdf(abs_rts_1))))
 
+    log_like_all = np.concatenate((log_like_pres, log_like_abs))
     # print(sim_rt[0, :])
     # print(np.mean(sim_rt[0, :]))
-    # print(p_like_abs)
+    # print(log_like_abs)
     #
     # print(sim_rt[1, :])
     # print(np.mean(sim_rt[1, :]))
-    # print(p_like_pres)
+    # print(log_like_pres)
 
-    p_like = (1 - lapse) * p_like_pres + (lapse / 2) * np.exp(-reward / temp) + \
-        (1 - lapse) * p_like_abs + (lapse / 2) * np.exp(-reward / temp)
-    return - np.log(p_like)
-
-    best_logsig = datarr[np.argmin(yp), 0]
-    best_sigma = np.exp(best_logsig)
-    data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
-            sub_data.query('setsize == 16')]
-
-    stats = get_coarse_stats(best_sigma, d_map_samples)
-    for i in range(stats.shape[0]):
-        mu = stats[i, :, 0]
-        sigma = stats[i, :, 1]
-        rootgrid = get_rootgrid(sigma, mu)
-        decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)[1]
-        sim_rt = get_rt(sigma, mu, decisions)
-
-        currdata = data[i]
-        pres_rts_0 = currdata.query('resp == 2 & target == \'Present\'').rt.values
-        pres_rts_1 = currdata.query('resp == 1 & target == \'Present\'').rt.values
-
-        abs_rts_0 = currdata.query('resp == 2 & target == \'Absent\'').rt.values
-        abs_rts_1 = currdata.query('resp == 1 & target == \'Absent\'').rt.values
-
-        ax = axes[i]
-        sns.kdeplot(sim_rt[1], bw=0.1, shade=True, label='Sim corr pres', color='blue', ax=ax)
-        sns.kdeplot(sim_rt[0], bw=0.1, shade=True, label='Sim corr abs', color='orange', ax=ax)
-        sns.kdeplot(abs_rts_0, bw=0.1, shade=True, label='Data corr abs', color='red', ax=ax)
-        sns.kdeplot(pres_rts_1, bw=0.1, shade=True, label='Data corr pres', color='darkblue', ax=ax)
-
-        ax.set_ylabel('Density estimate')
-        ax.legend()
-
-        if i == 2:
-            ax.xlabel('RT (s)')
-            ax.xlim([0, 6])
+    likelihood_pertrial = (1 - lapse) * np.exp(log_like_all) + (lapse / 2) * np.exp(-reward / temp)
+    return - np.sum(np.log(likelihood_pertrial))
 
 
 def get_data_likelihood(sub_data, sigma):
@@ -287,8 +260,9 @@ if __name__ == '__main__':
     plt.ylabel(r'log(likelihood)')
     plt.title('Subject {} Bayesian Opt tested points'.format(subject_num))
 
+    plt.savefig(savepath + 'subject_{}_bayes_opt_testpoints.png'.format(subject_num))
     # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
-    fig, axes = plt.subplots(3, 1, sharex=True)
+    fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
     best_logsig = datarr[np.argmin(yp), 0]
     best_sigma = np.exp(best_logsig)
@@ -321,5 +295,7 @@ if __name__ == '__main__':
         ax.legend()
 
         if i == 2:
-            ax.xlabel('RT (s)')
-            ax.xlim([0, 6])
+            ax.set_xlabel('RT (s)')
+            ax.set_xlim([0, 6])
+
+        plt.savefig(savepath + 'subject_{}_bayes_opt_bestfits.png'.format(subject_num))
