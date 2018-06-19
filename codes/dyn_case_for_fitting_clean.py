@@ -7,7 +7,7 @@ import numpy as np
 import itertools as it
 import seaborn as sns
 from scipy.optimize import brentq
-from scipy.optimize import minimize
+import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import pandas as pd
 from pathlib import Path
@@ -25,12 +25,13 @@ d_map_samples = 2000
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
+subject_num = 1
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
 
 temp = np.mean(np.array(exp1['rt']))
-sub_data = exp1.query('subno == 1 & dyn == \'Dynamic\'')
+sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
 
 
 def d_map(N, epsilons, fine_sigma):
@@ -165,7 +166,7 @@ def get_rt(sigma, mu, decisions):
     return response_times.reshape(2, numsims)
 
 
-def get_likelihood_N(data, sim_rt, reward):
+def get_single_N_likelihood(data, sim_rt, reward):
 
     pres_rts_0 = data.query('resp == 2 & target == \'Present\'').rt.values
     pres_rts_1 = data.query('resp == 1 & target == \'Present\'').rt.values
@@ -208,10 +209,43 @@ def get_likelihood_N(data, sim_rt, reward):
 
     p_like = (1 - lapse) * p_like_pres + (lapse / 2) * np.exp(-reward / temp) + \
         (1 - lapse) * p_like_abs + (lapse / 2) * np.exp(-reward / temp)
-    return p_like
+    return - np.log(p_like)
+
+    best_logsig = datarr[np.argmin(yp), 0]
+    best_sigma = np.exp(best_logsig)
+    data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
+            sub_data.query('setsize == 16')]
+
+    stats = get_coarse_stats(best_sigma, d_map_samples)
+    for i in range(stats.shape[0]):
+        mu = stats[i, :, 0]
+        sigma = stats[i, :, 1]
+        rootgrid = get_rootgrid(sigma, mu)
+        decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)[1]
+        sim_rt = get_rt(sigma, mu, decisions)
+
+        currdata = data[i]
+        pres_rts_0 = currdata.query('resp == 2 & target == \'Present\'').rt.values
+        pres_rts_1 = currdata.query('resp == 1 & target == \'Present\'').rt.values
+
+        abs_rts_0 = currdata.query('resp == 2 & target == \'Absent\'').rt.values
+        abs_rts_1 = currdata.query('resp == 1 & target == \'Absent\'').rt.values
+
+        ax = axes[i]
+        sns.kdeplot(sim_rt[1], bw=0.1, shade=True, label='Sim corr pres', color='blue', ax=ax)
+        sns.kdeplot(sim_rt[0], bw=0.1, shade=True, label='Sim corr abs', color='orange', ax=ax)
+        sns.kdeplot(abs_rts_0, bw=0.1, shade=True, label='Data corr abs', color='red', ax=ax)
+        sns.kdeplot(pres_rts_1, bw=0.1, shade=True, label='Data corr pres', color='darkblue', ax=ax)
+
+        ax.set_ylabel('Density estimate')
+        ax.legend()
+
+        if i == 2:
+            ax.xlabel('RT (s)')
+            ax.xlim([0, 6])
 
 
-def get_likelihood(sub_data, sigma):
+def get_data_likelihood(sub_data, sigma):
     sigma = np.exp(sigma)
     print(sigma)
     likelihood = 0
@@ -227,20 +261,65 @@ def get_likelihood(sub_data, sigma):
         rootgrid = get_rootgrid(sigma, mu)
         decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        likelihood += get_likelihood_N(data[i], sim_rt, 1)
+        likelihood += get_single_N_likelihood(data[i], sim_rt, 1)
 
-    return -np.log(likelihood)
+    return likelihood
 
 
 if __name__ == '__main__':
-    use_BO = False
-
     def subject_likelihood(sigma):
-        return get_likelihood(sub_data, sigma)
+        return get_data_likelihood(sub_data, sigma)
 
-    if use_BO:
-        bnds = np.array(((-2, 2),))  # [n_samples, 2] shaped array with bounds
-        x_opt = bayesian_optimisation(n_iters=50, sample_loss=subject_likelihood,
-                                      bounds=bnds, n_pre_samples=10)
+    bnds = np.array(((-2, 1.5),))  # [n_samples, 2] shaped array with bounds
+    x_opt = bayesian_optimisation(n_iters=50, sample_loss=subject_likelihood,
+                                  bounds=bnds, n_pre_samples=15)
 
-    x_opt = minimize(subject_likelihood, 1, method='SLSQP', bounds=((1e-4, 1),))
+    xp, yp = x_opt
+    # Pull out each of the log(sigma) that the optimizer tested and put them in an array together
+    # with the associated log(likelihood). datarr is (N x 2) where N is the number of optimize samps
+    datarr = np.array((x_opt[0].reshape(-1), x_opt[1])).T
+    sortdatarr = datarr[np.argsort(datarr[:, 0]), :]
+
+    # Plot test points and likelihoods
+    plt.figure()
+    plt.scatter(sortdatarr[:, 0], sortdatarr[:, 1])
+    plt.xlabel(r'$log(\sigma)$')
+    plt.ylabel(r'log(likelihood)')
+    plt.title('Subject {} Bayesian Opt tested points'.format(subject_num))
+
+    # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
+    fig, axes = plt.subplots(3, 1, sharex=True)
+
+    best_logsig = datarr[np.argmin(yp), 0]
+    best_sigma = np.exp(best_logsig)
+    data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
+            sub_data.query('setsize == 16')]
+
+    stats = get_coarse_stats(best_sigma, d_map_samples)
+    for i in range(stats.shape[0]):
+        mu = stats[i, :, 0]
+        sigma = stats[i, :, 1]
+        rootgrid = get_rootgrid(sigma, mu)
+        decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)[1]
+        sim_rt = get_rt(sigma, mu, decisions)
+
+        currdata = data[i]
+        pres_rts_0 = currdata.query('resp == 2 & target == \'Present\'').rt.values
+        pres_rts_1 = currdata.query('resp == 1 & target == \'Present\'').rt.values
+
+        abs_rts_0 = currdata.query('resp == 2 & target == \'Absent\'').rt.values
+        abs_rts_1 = currdata.query('resp == 1 & target == \'Absent\'').rt.values
+
+        ax = axes[i]
+        ax.set_title('N = {}'.format(N_array[i]))
+        sns.kdeplot(sim_rt[1], bw=0.1, shade=True, label='Sim corr pres', color='blue', ax=ax)
+        sns.kdeplot(sim_rt[0], bw=0.1, shade=True, label='Sim corr abs', color='orange', ax=ax)
+        sns.kdeplot(abs_rts_0, bw=0.1, shade=True, label='Data corr abs', color='red', ax=ax)
+        sns.kdeplot(pres_rts_1, bw=0.1, shade=True, label='Data corr pres', color='darkblue', ax=ax)
+
+        ax.set_ylabel('Density estimate')
+        ax.legend()
+
+        if i == 2:
+            ax.xlabel('RT (s)')
+            ax.xlim([0, 6])
