@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq, minimize
-from itertools import product
+import itertools as it
 import seaborn as sbn
 import pickle
 
@@ -21,7 +21,7 @@ def combs(a, r):
     """
     Return successive r-length cartesian product of values in a...
     """
-    return np.array(list(product(a, repeat=r)))
+    return np.array(list(it.product(a, repeat=r)))
 
 
 grid_values = combs(grid_space, 4)
@@ -29,10 +29,17 @@ phi_values = combs(grid_space, 2)
 
 
 def global_posterior(Phi_slice, k):
-    phi = Phi_slice[:, 0]
-    phi_bar = Phi_slice[:, 1]
-    beta = Phi_slice[:, 2]
-    beta_bar = Phi_slice[:, 3]
+
+    if isinstance(Phi_slice, tuple) or len(Phi_slice.shape) == 1:
+        phi = Phi_slice[0]
+        phi_bar = Phi_slice[1]
+        beta = Phi_slice[2]
+        beta_bar = Phi_slice[3]
+    else:
+        phi = Phi_slice[:, 0]
+        phi_bar = Phi_slice[:, 1]
+        beta = Phi_slice[:, 2]
+        beta_bar = Phi_slice[:, 3]
 
     pres_likelihood = 1 / N * ((phi * beta_bar) + (phi_bar * beta) +
                                ((N - k) * (phi_bar * beta_bar)))
@@ -66,8 +73,8 @@ def p_new_ev_stay(Phi, sigma, k):
 
     for x in roots.items():
         if 150 not in x[1]:
-            prob = np.sum((1 - g_t) * norm.pdf(x[1], 1, sigma) + g_t * (b_t * norm.pdf(x[1], 1, sigma) +
-                                                                        (1 - b_t) * norm.pdf(x[1], 0, sigma)))
+            prob = np.sum((1 - g_t) * norm.pdf(x[1], 1, sigma) + g_t * \
+                (b_t * norm.pdf(x[1], 1, sigma) + (1 - b_t) * norm.pdf(x[1], 0, sigma)))
 
             phi_index = np.where(grid_space == x[0][0])[0]
             phi_bar_index = np.where(grid_space == x[0][1])[0]
@@ -111,8 +118,24 @@ def get_root(C, val_tp1, val_t):
     # using the root values
 
 
-def get_close(C, val_t, root):
-    return grid_space[np.abs(grid_space - (norm.pdf(root, C, sigma) * val_t)).argmin()]
+def nearest_grid_val(C, val_t, x):
+    return grid_space[np.abs(grid_space - (norm.pdf(x, C, sigma) * val_t)).argmin()]
+
+def grid_val_index(Phi):
+    '''
+    returns the index of Phi value in flatten grid_values
+    '''
+    not_in_grid = Phi[0] not in grid_space or Phi[1] not in grid_space\
+        or Phi[2] not in grid_space or Phi[3] not in grid_space
+    if not_in_grid:
+        raise NameError("Input Phi must lie on grid")
+    else:
+        phi_index = np.where(grid_space == Phi[0])[0][0]
+        phi_bar_index = np.where(grid_space == Phi[1])[0][0]
+        beta_index = np.where(grid_space == Phi[2])[0][0]
+        beta_bar_index = np.where(grid_space == Phi[3])[0][0]
+
+        return (10**3)*phi_index + (10**2)*phi_bar_index + 10*beta_index + beta_bar_index
 
 
 def get_Update_X(phi_spot):
@@ -137,10 +160,10 @@ def get_Update_X(phi_spot):
 
         # using the root values for phi_tp1, we find the correspondent value
         # of phi_bar_tp1 that would result from an update with the same root
-        phi_bar_tp_1 = get_close(0, phi_bar_t, root_1)
-        phi_bar_tp_2 = get_close(0, phi_bar_t, root_2)
-        phi_tp_3 = get_close(1, phi_bar_t, root_3)
-        phi_tp_4 = get_close(1, phi_bar_t, root_4)
+        phi_bar_tp_1 = nearest_grid_val(0, phi_bar_t, root_1)
+        phi_bar_tp_2 = nearest_grid_val(0, phi_bar_t, root_2)
+        phi_tp_3 = nearest_grid_val(1, phi_bar_t, root_3)
+        phi_tp_4 = nearest_grid_val(1, phi_bar_t, root_4)
 
         # based on the aquired phi_bar_tp1, we match the root_1
         # with the proper phi_tp1, phi_bar_tp1 pair
@@ -171,6 +194,40 @@ def get_Update_X(phi_spot):
 global_roots = {}
 for x in phi_values:
     global_roots[tuple(x)] = get_Update_X(tuple(x))
+
+def get_rt(sigma, mu, decisions):
+    numsims = 2000
+    # pool = mulpro.Pool(processes=mulpro.cpu_count())
+    C_vals = [0] * numsims
+    C_vals.extend([1] * numsims)
+    arglists = it.product(C_vals, [decisions], [sigma], [mu], [dt])
+    # observer_outputs = pool.map(simulate_observer, arglists)
+    # pool.close()
+    observer_outputs = []
+    for arglist in arglists:
+        observer_outputs.append(simulate_observer(arglist))
+    #g_grid = np.array([x[2] for x in observer_outputs])
+    response_times = np.array([x[1] for x in observer_outputs])
+    return response_times.reshape(2, numsims)
+
+def simulate_observer(C, decisions, sigma, mu, dt, init_Phi):
+    step = 0
+    t = 0
+    k = 0
+    Phi = grid_values[4444]
+    while t < (T - dt):
+        step += 1
+        t = step * dt
+        x_t = norm.rvs(loc=mu, scale=sigma) * dt
+        print(x_t)
+        Phi_t = (nearest_grid_val(1, Phi[0], x_t), nearest_grid_val(0, Phi[1], x_t), Phi[2], Phi[3])
+        index = grid_val_index(Phi_t)
+        print(index)
+        decision_t = decisions[index, step]
+        print(decision_t)
+        if decision_t != 0:
+            break
+    return (decision_t, t, Phi_t)
 
 
 def main(argvec):
@@ -212,11 +269,13 @@ def main(argvec):
 
     return V_base, decisions
 
+outcomes = main((0.3, 0.9, 0.05, 1, 0))
+
     # V_full = V_base.expand_dims(np.arrange(N), 3)
     # decision_full = decisions.expand_dims(np.arange(N), 3)
     #
     # # backwards induction through items
-    # 
+    #
     # for index in range(1, N):
     #     V_item = V_full[:, :, N - index]
     #     decision_item = decision_full[:, :, N - index]
