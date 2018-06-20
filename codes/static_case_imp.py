@@ -214,15 +214,16 @@ def simulate_observer(C, decisions, sigma, mu, dt, init_Phi):
     step = 0
     t = 0
     k = 0
-    Phi = grid_values[4444]
+    Phi = init_Phi
     while t < (T - dt):
         step += 1
         t = step * dt
-        x_t = norm.rvs(loc=mu, scale=sigma) * dt
+        x_t = norm.rvs(loc=mu, scale=sigma)
         print(x_t)
-        Phi_t = (nearest_grid_val(1, Phi[0], x_t), nearest_grid_val(0, Phi[1], x_t), Phi[2], Phi[3])
+        Phi_t = (nearest_grid_val(1, Phi[0], x_t),
+                    nearest_grid_val(0, Phi[1], x_t), Phi[2], Phi[3])
         index = grid_val_index(Phi_t)
-        print(index)
+        print(Phi_t)
         decision_t = decisions[index, step]
         print(decision_t)
         if decision_t != 0:
