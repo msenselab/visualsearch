@@ -9,7 +9,7 @@ import pickle
 T = 6
 t_w = 0.5
 N = 8
-size = 10
+size = 20
 sigma = 1
 
 
@@ -40,6 +40,8 @@ def global_posterior(Phi_slice, k):
         phi_bar = Phi_slice[:, 1]
         beta = Phi_slice[:, 2]
         beta_bar = Phi_slice[:, 3]
+
+
 
     pres_likelihood = 1 / N * ((phi * beta_bar) + (phi_bar * beta) +
                                ((N - k) * (phi_bar * beta_bar)))
@@ -229,6 +231,19 @@ def simulate_observer(C, decisions, sigma, mu, dt, init_Phi):
             break
     return (decision_t, t, Phi_t)
 
+def get_rt(sigma, mu, decisions):
+    numsims = 2000
+    # pool = mulpro.Pool(processes=mulpro.cpu_count())
+    C_vals = [0] * numsims
+    C_vals.extend([1] * numsims)
+    arglists = it.product(C_vals, [decisions], [sigma], [mu], [dt])
+    # observer_outputs = pool.map(simulate_observer, arglists)
+    # pool.close()
+    observer_outputs = []
+    for arglist in arglists:
+        observer_outputs.append(simulate_observer(arglist))
+    response_times = np.array([x[1] for x in observer_outputs])
+    return response_times.reshape(2, numsims)
 
 def main(argvec):
     dt, sigma, rho, reward, punishment = argvec
