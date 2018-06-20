@@ -27,7 +27,11 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
-subject_num = 3
+subject_num = 4
+print('Subject number {}'.format(subject_num))
+reward = 2
+punishment = -.1
+rho = 0.05
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
@@ -109,7 +113,7 @@ def simulate_observer(arglist):
 
 
 def get_rootgrid(sigma, mu):
-    testx = np.linspace(-25, 25, 1000)
+    testx = np.linspace(-50, 50, 1000)
     if sigma[1] < sigma[0]:
         ourpeak = testx[np.argmax(f(testx, 0.5, sigma, mu))]
     elif sigma[0] < sigma[1]:
@@ -121,16 +125,16 @@ def get_rootgrid(sigma, mu):
             g_tp1 = g_values[j]
             try:
                 rootgrid[i, j, 0] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma, mu), -25, ourpeak)
+                    lambda x: g_tp1 - f(x, g_t, sigma, mu), -50, ourpeak)
                 rootgrid[i, j, 1] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 25)
+                    lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 50)
             except ValueError:
                 if g_t >= g_tp1:
-                    rootgrid[i, j, 0] = -25
-                    rootgrid[i, j, 1] = -25
+                    rootgrid[i, j, 0] = -50
+                    rootgrid[i, j, 1] = -50
                 elif g_t < g_tp1:
-                    rootgrid[i, j, 0] = 25
-                    rootgrid[i, j, 1] = 25
+                    rootgrid[i, j, 0] = 50
+                    rootgrid[i, j, 1] = 50
     return rootgrid
 
 
@@ -256,7 +260,7 @@ def get_data_likelihood(sub_data, sigma):
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
-        decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)[1]
+        decisions = back_induct(reward, punishment, rho, sigma, mu, rootgrid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
         likelihood += get_single_N_likelihood(data[i], sim_rt, 1)
 
@@ -298,7 +302,7 @@ if __name__ == '__main__':
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
-        decisions = back_induct(1, 0, 0.05, sigma, mu, rootgrid)[1]
+        decisions = back_induct(reward, punishment, rho, sigma, mu, rootgrid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
 
         currdata = data[i]
@@ -322,4 +326,4 @@ if __name__ == '__main__':
             ax.set_xlabel('RT (s)')
             ax.set_xlim([0, 6])
 
-        plt.savefig(savepath + 'subject_{}_bayes_opt_bestfits.png'.format(subject_num))
+    plt.savefig(savepath + 'subject_{}_bayes_opt_bestfits.png'.format(subject_num))
