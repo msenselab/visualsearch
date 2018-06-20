@@ -8,11 +8,11 @@ import itertools as it
 import seaborn as sns
 from scipy.optimize import brentq
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde, norm
+from scipy.stats import gaussian_kde
 import pandas as pd
 from pathlib import Path
 from gauss_opt import bayesian_optimisation
-from dynamic_adhoc_twosigma import p_new_ev, posterior
+from dynamic_adhoc_twosigma import f, p_new_ev, posterior
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -65,30 +65,6 @@ def get_coarse_stats(fine_sigma, num_samples):
         stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
                              [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
     return stats
-
-
-def f(x, g_t, sigma, mu):
-    ''' x_(t + 1) is x
-    Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
-    the appropriate g_(t+1) as an output for a single value of x_(t+1)
-    '''
-    pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
-    abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
-    if isinstance(x, np.ndarray):
-        pres_draw[pres_draw < 1e-10] = 1e-10
-        abs_draw[pres_draw < 1e-10] = 1e-10
-    else:
-        if pres_draw < 1e-10:
-            pres_draw = 1e-10
-        if abs_draw < 1e-10:
-            abs_draw = 1e-10
-
-    log_given_pres = np.log(g_t) + np.log(pres_draw)
-    log_normalizer = np.log((g_t * pres_draw + (1-g_t) * abs_draw))
-
-    post = np.exp(log_given_pres - log_normalizer)
-
-    return post
 
 
 def simulate_observer(arglist):
