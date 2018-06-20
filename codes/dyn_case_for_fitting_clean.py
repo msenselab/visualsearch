@@ -288,7 +288,7 @@ if __name__ == '__main__':
     plt.ylabel(r'log(likelihood)')
     plt.title('Subject {} Bayesian Opt tested points'.format(subject_num))
 
-    plt.savefig(savepath + 'subject_{}_bayes_opt_testpoints.png'.format(subject_num))
+    plt.savefig(savepath + '/subject_{}_bayes_opt_testpoints.png'.format(subject_num))
     # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
     fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
@@ -326,4 +326,4 @@ if __name__ == '__main__':
             ax.set_xlabel('RT (s)')
             ax.set_xlim([0, 6])
 
-    plt.savefig(savepath + 'subject_{}_bayes_opt_bestfits.png'.format(subject_num))
+    plt.savefig(savepath + '/subject_{}_bayes_opt_bestfits.png'.format(subject_num))
