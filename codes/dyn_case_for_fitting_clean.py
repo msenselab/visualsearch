@@ -27,7 +27,7 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
-subject_num = 1
+subject_num = 4
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
@@ -85,7 +85,7 @@ def simulate_observer(arglist):
 
 
 def get_rootgrid(sigma, mu):
-    testx = np.linspace(-25, 25, 1000)
+    testx = np.linspace(-150, 150, 1000)
     if sigma[1] < sigma[0]:
         ourpeak = testx[np.argmax(f(testx, 0.5, sigma, mu))]
     elif sigma[0] < sigma[1]:
@@ -97,16 +97,16 @@ def get_rootgrid(sigma, mu):
             g_tp1 = g_values[j]
             try:
                 rootgrid[i, j, 0] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma, mu), -25, ourpeak)
+                    lambda x: g_tp1 - f(x, g_t, sigma, mu), -150, ourpeak)
                 rootgrid[i, j, 1] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 25)
+                    lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 150)
             except ValueError:
                 if g_t >= g_tp1:
-                    rootgrid[i, j, 0] = -25
-                    rootgrid[i, j, 1] = -25
+                    rootgrid[i, j, 0] = -150
+                    rootgrid[i, j, 1] = -150
                 elif g_t < g_tp1:
-                    rootgrid[i, j, 0] = 25
-                    rootgrid[i, j, 1] = 25
+                    rootgrid[i, j, 0] = 150
+                    rootgrid[i, j, 1] = 150
     return rootgrid
 
 
