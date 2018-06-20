@@ -11,7 +11,7 @@ import itertools as it
 import seaborn as sns
 import time
 from scipy.optimize import brentq
-from matplotlib.animation import FuncAnimation
+from scipy.stats import norm
 import pickle
 import os
 
@@ -20,9 +20,12 @@ t_w = 0.5
 size = 100
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
 
-#functions that map from the fine sigma to a coarse grained mean and sd for pres and absent dist
+# functions that map from the fine sigma to a coarse grained mean and sd for pres and absent dist
+
+
 def d_map(N, epsilons, fine_sigma):
-    return -1*(1/(2*(fine_sigma**2)))+np.log(1/N)+np.log(np.sum(np.exp(epsilons/fine_sigma**2)))
+    return -1 * (1 / (2 * (fine_sigma**2))) + np.log(1 / N) + np.log(np.sum(np.exp(epsilons / fine_sigma**2)))
+
 
 def sample_epsilon(C, N, fine_sigma):
     epsilons = np.random.normal(0, fine_sigma, N)
@@ -30,12 +33,13 @@ def sample_epsilon(C, N, fine_sigma):
         epsilons[0] = np.random.normal(1, fine_sigma)
     return epsilons
 
+
 def get_coarse_stats(N, fine_sigma, num_samples):
     '''
     returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats
     row 1 is the mean and row 2 is the sd
     '''
-    stats = np.zeros((2,2))
+    stats = np.zeros((2, 2))
     pres_samples = []
     abs_samples = []
     for i in range(num_samples):
@@ -49,14 +53,29 @@ def get_coarse_stats(N, fine_sigma, num_samples):
 
     return stats
 
+
 def f(x, g_t, sigma, mu):
     ''' x_(t + 1) is x
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    p_given_true = (g_t * np.exp(- (x - mu[1])**2 / (2 * sigma[1]**2)))
-    return p_given_true / (p_given_true + (1 - g_t) * np.exp(- (x - mu[0])**2 /
-                                                                              (2 * sigma[0]**2)))
+    pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
+    abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
+    if isinstance(x, np.ndarray):
+        pres_draw[pres_draw < 1e-10] = 1e-10
+        abs_draw[pres_draw < 1e-10] = 1e-10
+    else:
+        if pres_draw < 1e-10:
+            pres_draw = 1e-10
+        if abs_draw < 1e-10:
+            abs_draw = 1e-10
+
+    log_given_pres = np.log(g_t) + np.log(pres_draw)
+    log_normalizer = np.log((g_t * pres_draw + (1 - g_t) * abs_draw))
+
+    post = np.exp(log_given_pres - log_normalizer)
+
+    return post
 
 
 def p_new_ev(x, g_t, sigma, mu):

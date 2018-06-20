@@ -27,7 +27,7 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
-subject_num = 1
+subject_num = 3
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
@@ -267,8 +267,8 @@ if __name__ == '__main__':
     def subject_likelihood(sigma):
         return get_data_likelihood(sub_data, sigma)
 
-    bnds = np.array(((-2, 1.5),))  # [n_samples, 2] shaped array with bounds
-    x_opt = bayesian_optimisation(n_iters=50, sample_loss=subject_likelihood,
+    bnds = np.array(((-1.7, 1.),))  # [n_samples, 2] shaped array with bounds
+    x_opt = bayesian_optimisation(n_iters=100, sample_loss=subject_likelihood,
                                   bounds=bnds, n_pre_samples=15)
 
     xp, yp = x_opt
