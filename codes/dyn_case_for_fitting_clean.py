@@ -8,11 +8,11 @@ import itertools as it
 import seaborn as sns
 from scipy.optimize import brentq
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
+from scipy.stats import gaussian_kde, norm
 import pandas as pd
 from pathlib import Path
 from gauss_opt import bayesian_optimisation
-from dynamic_adhoc_twosigma import f, p_new_ev, posterior
+from dynamic_adhoc_twosigma import p_new_ev, posterior
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -27,7 +27,7 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
-subject_num = 4
+subject_num = 1
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
@@ -67,6 +67,30 @@ def get_coarse_stats(fine_sigma, num_samples):
     return stats
 
 
+def f(x, g_t, sigma, mu):
+    ''' x_(t + 1) is x
+    Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
+    the appropriate g_(t+1) as an output for a single value of x_(t+1)
+    '''
+    pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
+    abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
+    if isinstance(x, np.ndarray):
+        pres_draw[pres_draw < 1e-10] = 1e-10
+        abs_draw[pres_draw < 1e-10] = 1e-10
+    else:
+        if pres_draw < 1e-10:
+            pres_draw = 1e-10
+        if abs_draw < 1e-10:
+            abs_draw = 1e-10
+
+    log_given_pres = np.log(g_t) + np.log(pres_draw)
+    log_normalizer = np.log((g_t * pres_draw + (1-g_t) * abs_draw))
+
+    post = np.exp(log_given_pres - log_normalizer)
+
+    return post
+
+
 def simulate_observer(arglist):
     C, decisions, sigma, mu, dt = arglist
     step = 0
@@ -85,7 +109,7 @@ def simulate_observer(arglist):
 
 
 def get_rootgrid(sigma, mu):
-    testx = np.linspace(-150, 150, 1000)
+    testx = np.linspace(-25, 25, 1000)
     if sigma[1] < sigma[0]:
         ourpeak = testx[np.argmax(f(testx, 0.5, sigma, mu))]
     elif sigma[0] < sigma[1]:
@@ -97,16 +121,16 @@ def get_rootgrid(sigma, mu):
             g_tp1 = g_values[j]
             try:
                 rootgrid[i, j, 0] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma, mu), -150, ourpeak)
+                    lambda x: g_tp1 - f(x, g_t, sigma, mu), -25, ourpeak)
                 rootgrid[i, j, 1] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 150)
+                    lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 25)
             except ValueError:
                 if g_t >= g_tp1:
-                    rootgrid[i, j, 0] = -150
-                    rootgrid[i, j, 1] = -150
+                    rootgrid[i, j, 0] = -25
+                    rootgrid[i, j, 1] = -25
                 elif g_t < g_tp1:
-                    rootgrid[i, j, 0] = 150
-                    rootgrid[i, j, 1] = 150
+                    rootgrid[i, j, 0] = 25
+                    rootgrid[i, j, 1] = 25
     return rootgrid
 
 
