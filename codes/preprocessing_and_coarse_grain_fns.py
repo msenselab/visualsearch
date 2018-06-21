@@ -24,7 +24,7 @@ def get_subject_data(subno):
     if subno not in set(exp1.subno):
         raise ValueError('Subject number not present in data')
 
-    subject_data = exp1.query('subno == {} & dyn == \'Dynamic\' & correct == 1'.format(subno))
+    subject_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subno))
     return subject_data.values
 
 
