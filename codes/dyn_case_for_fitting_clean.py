@@ -31,7 +31,6 @@ subject_num = 4
 print('Subject number {}'.format(subject_num))
 reward = 2
 punishment = -.1
-rho = 0.01
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
@@ -190,20 +189,11 @@ def solve_rho(reward, sigma, mu, roots):
         rho = np.exp(log_rho)
         print(rho)
         values = back_induct(reward, 0, rho, sigma, mu, roots)[0]
-        return values[int(size/2), 0]**2
+        return values[int(size/2), 0]
 
-    bnds = np.array(((-5, 1),))  # [n_samples, 2] shaped array with bounds
+    opt_log_rho = brentq(V_in_rho, -5, np.log(reward+0.1))
 
-    x_opt = bayesian_optimisation(n_iters=25, sample_loss=V_in_rho,
-                                  bounds=bnds, n_pre_samples=5)
-
-    xp, yp = x_opt
-
-    print(xp)
-    print(yp)
-    best_logrho = xp[np.argmin(yp)]
-    best_rho = np.exp(best_logrho)
-    return best_rho, xp, np.sqrt(yp)
+    return np.exp(opt_log_rho)
 
 def get_rt(sigma, mu, decisions):
     numsims = 2000
