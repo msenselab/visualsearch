@@ -4,7 +4,6 @@ Ad hoc model with differing sigma for the present and absent cases
 '''
 
 import numpy as np
-import sys
 import itertools as it
 import seaborn as sns
 from scipy.optimize import brentq
@@ -28,10 +27,7 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
-try:
-    subject_num = int(sys.argv[1])
-except IndexError:
-    subject_num = 4
+subject_num = 4
 print('Subject number {}'.format(subject_num))
 reward = 2
 punishment = -.1
@@ -150,8 +146,8 @@ def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
     # in advance
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
-    decision_vals[:, 1] = (g_values * R[1, 1] + (1 - g_values) * R[1, 0]) - rho * t_w  # resp pres
-    decision_vals[:, 0] = ((1 - g_values) * R[0, 0] + g_values * R[0, 1]) - rho * t_w  # resp abs
+    decision_vals[:, 1] = (g_values * R[1, 1] + (1 - g_values) * R[1, 0])- rho * t_w  # respond present
+    decision_vals[:, 0] = ((1 - g_values) * R[0, 0] + g_values * R[0, 1])- rho * t_w  # respond absent
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
@@ -184,7 +180,6 @@ def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
                                               decision_vals[i, 0], decision_vals[i, 1]))
     return V_full, decisions
 
-
 def solve_rho(reward, sigma, mu, roots):
     '''
     Root finding procedure to find rho given the constrain V(t=0)=0.
@@ -209,7 +204,6 @@ def solve_rho(reward, sigma, mu, roots):
     best_logrho = xp[np.argmin(yp)]
     best_rho = np.exp(best_logrho)
     return best_rho, xp, np.sqrt(yp)
-
 
 def get_rt(sigma, mu, decisions):
     numsims = 2000
