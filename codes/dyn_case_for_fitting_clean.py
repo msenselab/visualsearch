@@ -146,8 +146,8 @@ def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
     # in advance
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
-    decision_vals[:, 1] = g_values * R[1, 1] + (1 - g_values) * R[1, 0]  # respond present
-    decision_vals[:, 0] = (1 - g_values) * R[0, 0] + g_values * R[0, 1]  # respond absent
+    decision_vals[:, 1] = (g_values * R[1, 1] + (1 - g_values) * R[1, 0])- rho * t_w  # respond present
+    decision_vals[:, 0] = ((1 - g_values) * R[0, 0] + g_values * R[0, 1])- rho * t_w  # respond absent
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
@@ -192,7 +192,7 @@ def solve_rho(reward, sigma, mu, roots):
         values = back_induct(reward, 0, rho, sigma, mu, roots)[0]
         return values[int(size/2), 0]
 
-    bnds = np.array(((-5, -2),))  # [n_samples, 2] shaped array with bounds
+    bnds = np.array(((-5, 3),))  # [n_samples, 2] shaped array with bounds
 
     x_opt = bayesian_optimisation(n_iters=25, sample_loss=V_in_rho,
                                   bounds=bnds, n_pre_samples=5)
@@ -203,8 +203,7 @@ def solve_rho(reward, sigma, mu, roots):
     print(yp)
     best_logrho = np.min(yp)
     best_rho = np.exp(best_logrho)
-    
-    return best_rho
+    return x_opt
 
 def get_rt(sigma, mu, decisions):
     numsims = 2000
