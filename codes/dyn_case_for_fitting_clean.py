@@ -4,6 +4,7 @@ Ad hoc model with differing sigma for the present and absent cases
 '''
 
 import numpy as np
+import sys
 import itertools as it
 import seaborn as sns
 from scipy.optimize import brentq
@@ -27,7 +28,10 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
-subject_num = 4
+try:
+    subject_num = int(sys.argv[1])
+except IndexError:
+    subject_num = 4
 print('Subject number {}'.format(subject_num))
 reward = 2
 punishment = -.1
@@ -203,7 +207,7 @@ def solve_rho(reward, sigma, mu, roots):
     print(yp)
     best_logrho = np.min(yp)
     best_rho = np.exp(best_logrho)
-    
+
     return best_rho
 
 def get_rt(sigma, mu, decisions):
