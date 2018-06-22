@@ -184,15 +184,15 @@ def solve_rho(reward, sigma, mu, roots):
     '''
     Root finding procedure to find rho given the constrain V(t=0)=0.
     This criteria comes from the invariance of policy with
-    respect to changes in reward.
+    respect to linear shift in V
     '''
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
         print(rho)
         values = back_induct(reward, 0, rho, sigma, mu, roots)[0]
-        return values[int(size/2), 0]
+        return values[int(size/2), 0]**2
 
-    bnds = np.array(((-5, 3),))  # [n_samples, 2] shaped array with bounds
+    bnds = np.array(((-5, 1),))  # [n_samples, 2] shaped array with bounds
 
     x_opt = bayesian_optimisation(n_iters=25, sample_loss=V_in_rho,
                                   bounds=bnds, n_pre_samples=5)
@@ -201,9 +201,9 @@ def solve_rho(reward, sigma, mu, roots):
 
     print(xp)
     print(yp)
-    best_logrho = np.min(yp)
+    best_logrho = xp[np.argmin(yp)]
     best_rho = np.exp(best_logrho)
-    return x_opt
+    return best_rho, xp, np.sqrt(yp)
 
 def get_rt(sigma, mu, decisions):
     numsims = 2000
