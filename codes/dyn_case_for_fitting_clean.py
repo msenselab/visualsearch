@@ -125,10 +125,13 @@ def get_rootgrid(sigma, mu):
     rootgrid = np.zeros((size, size, 2))  # NxN grid of values for g_t, g_tp1
     for i in range(size):
         g_t = g_values[i]
+        testeval_gt = f(testx, g_t, sigma, mu)
         if sigma[1] < sigma[0]:
-            peakval = np.amax(f(testx, g_t, sigma, mu))
+            testeval_gt[np.invert(np.isfinite(testeval_gt))] = 0.
+            peakval = np.amax(testeval_gt)
         elif sigma[0] < sigma[1]:
-            peakval = np.amin(f(testx, g_t, sigma, mu))
+            testeval_gt[np.invert(np.isfinite(testeval_gt))] = 1.
+            peakval = np.amin(testeval_gt)
         for j in range(size):
             g_tp1 = g_values[j]
             if sigma[1] < sigma[0] and g_tp1 > peakval:
