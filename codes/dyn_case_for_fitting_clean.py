@@ -212,7 +212,12 @@ def solve_rho(reward, sigma, mu, roots):
         values = back_induct(reward, punishment, rho, sigma, mu, roots)[0]
         return values[int(size/2), 0]
 
-    opt_log_rho = brentq(V_in_rho, -5, np.log(100 * reward))
+    #when optimizing for reward this optimization should be accounted for in choosing bounds
+    try:
+        opt_log_rho = brentq(V_in_rho, -0.1+np.log(reward), 0.1+np.log(reward))
+    except ValueError:
+        try: opt_log_rho = brentq(V_in_rho, -0.5+np.log(reward), 0.5+np.log(reward))
+        except ValueError: raise Exception("chosen reward too small")
 
     return np.exp(opt_log_rho)
 
