@@ -28,10 +28,16 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
+
 try:
-    subject_num = int(sys.argv[1])
-except:
+    subject_num = sys.argv[1]
+    if not subject_num.isnumeric():
+        subject_num = 1
+        print('Invalid subject number passed at prompt. Setting subject to 1')
+except ValueError:
     subject_num = 1
+    print('No subject number passed at prompt. Setting subject to 1')
+
 print('Subject number {}'.format(subject_num))
 reward = 1
 punishment = -.1
@@ -81,14 +87,6 @@ def f(x, g_t, sigma, mu):
     '''
     pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
     abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
-    # if isinstance(x, np.ndarray):
-    #     pres_draw[pres_draw < 1e-10] = 1e-10
-    #     abs_draw[pres_draw < 1e-10] = 1e-10
-    # else:
-    #     if pres_draw < 1e-10:
-    #         pres_draw = 1e-10
-    #     if abs_draw < 1e-10:
-    #         abs_draw = 1e-10
 
     log_given_pres = np.log(g_t) + np.log(pres_draw)
     log_normalizer = np.log((g_t * pres_draw + (1-g_t) * abs_draw))
@@ -138,10 +136,12 @@ def get_rootgrid(sigma, mu):
                 skiproot = False
 
             if not skiproot:
-                rootgrid[i, j, 0] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma, mu), -50, ourpeak)
-                rootgrid[i, j, 1] = brentq(
-                    lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 50)
+                def rootfunc(x):
+                    return g_tp1 - f(x, g_t, sigma, mu)
+                testx_neg = np.linspace(-50, ourpeak, 1000)
+                testx_pos = np.linspace(ourpeak, 50, 1000)
+                rootgrid[i, j, 0] = testx_neg[np.argmin(np.abs(rootfunc(testx_neg)))]
+                rootgrid[i, j, 1] = testx_pos[np.argmin(np.abs(rootfunc(testx_pos)))]
             elif skiproot:
                 if g_t >= g_tp1:
                     rootgrid[i, j, 0] = -50
@@ -160,8 +160,8 @@ def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
     # in advance
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
-    decision_vals[:, 1] = (g_values * R[1, 1] + (1 - g_values) * R[1, 0])- rho * t_w  # respond present
-    decision_vals[:, 0] = ((1 - g_values) * R[0, 0] + g_values * R[0, 1])- rho * t_w  # respond absent
+    decision_vals[:, 1] = (g_values * R[1, 1] + (1 - g_values) * R[1, 0]) - rho * t_w  # resp pres
+    decision_vals[:, 0] = ((1 - g_values) * R[0, 0] + g_values * R[0, 1]) - rho * t_w  # resp abs
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
@@ -203,7 +203,7 @@ def solve_rho(reward, sigma, mu, roots):
     '''
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
-        values = back_induct(reward, 0, rho, sigma, mu, roots)[0]
+        values = back_induct(reward, punishment, rho, sigma, mu, roots)[0]
         return values[int(size/2), 0]
 
     opt_log_rho = brentq(V_in_rho, -5, np.log(100 * reward))
