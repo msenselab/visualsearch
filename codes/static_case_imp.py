@@ -5,6 +5,7 @@ from scipy.optimize import brentq, minimize
 import itertools as it
 import seaborn as sbn
 import pickle
+from coarse_stats import get_coarse_stats
 
 T = 6
 t_w = 0.5
@@ -60,7 +61,7 @@ def local_posterior(Phi, k):
     return pres_likelihood / Z_b
 
 
-def p_new_ev_stay(Phi, sigma, k):
+def p_new_ev_stay(Phi, sigma, k, roots):
     '''
     this returns the probability of a new piece of evidence given
     evidence set Phi for the staying case i.e. evidence drawn from
@@ -68,7 +69,7 @@ def p_new_ev_stay(Phi, sigma, k):
     '''
     g_t = global_posterior(np.reshape(np.array(Phi), (1, 4)), k)
     b_t = local_posterior(Phi, k)
-    roots = global_roots[(Phi[0], Phi[1])]
+    roots = roots[(Phi[0], Phi[1])]
     prob_list = np.zeros(size**4)
 
     for x in roots.items():
@@ -191,9 +192,6 @@ def get_Update_X(phi_spot):
     return root_dict
 
 
-global_roots = {}
-for x in phi_values:
-    global_roots[tuple(x)] = get_Update_X(tuple(x))
 
 def get_rt(sigma, mu, decisions):
     numsims = 2000
@@ -234,13 +232,17 @@ def simulate_observer(C, decisions, sigma, mu, dt, init_Phi):
 def main(argvec):
     dt, sigma, rho, reward, punishment = argvec
 
+    global_roots = {}
+    for x in phi_values:
+        global_roots[tuple(x)] = get_Update_X(tuple(x))
+
     R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
                   (punishment, reward)])  # (pres/abs, pres/pres) in form decision / actual
 
     decision_vals_pres = global_posterior(grid_values, 0) * R[1, 1] + \
-        (1 - global_posterior(grid_values, 0)) * R[1, 0]  # respond present
+        (1 - global_posterior(grid_values, 0)) * R[1, 0] - rho*t_w  # respond present
     decision_vals_abs = (1 - global_posterior(grid_values, 0)) * R[0, 0] + \
-        global_posterior(grid_values, 0) * R[0, 1]  # respond absent
+        global_posterior(grid_values, 0) * R[0, 1] - rho*t_w # respond absent
 
     # N x 2 matrix. First column is resp. abs, second is pres
     decision_vals = np.c_[decision_vals_abs, decision_vals_pres]
@@ -259,7 +261,7 @@ def main(argvec):
         for i in range(size**4):
             Phi = grid_values[i]
             print(Phi)
-            new_phi_probs = p_new_ev_stay(Phi, sigma, N)
+            new_phi_probs = p_new_ev_stay(Phi, sigma, 0, global_roots)
             # new_phi_probs = new_phi_probs / np.sum(new_phi_probs)
             V_stay = np.sum(new_phi_probs * V_base[:, -(index - 1)]) - rho * t
 
@@ -270,7 +272,6 @@ def main(argvec):
 
     return V_base, decisions
 
-outcomes = main((0.3, 0.9, 0.05, 1, 0))
 
     # V_full = V_base.expand_dims(np.arrange(N), 3)
     # decision_full = decisions.expand_dims(np.arange(N), 3)
