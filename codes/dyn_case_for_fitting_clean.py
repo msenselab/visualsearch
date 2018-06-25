@@ -4,6 +4,7 @@ Ad hoc model with differing sigma for the present and absent cases
 '''
 
 import numpy as np
+import sys
 import itertools as it
 import seaborn as sns
 from scipy.optimize import brentq
@@ -27,9 +28,12 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
-subject_num = 4
+try:
+    subject_num = int(sys.argv[1])
+except:
+    subject_num = 1
 print('Subject number {}'.format(subject_num))
-reward = 2
+reward = 1
 punishment = -.1
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
@@ -77,14 +81,14 @@ def f(x, g_t, sigma, mu):
     '''
     pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
     abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
-    if isinstance(x, np.ndarray):
-        pres_draw[pres_draw < 1e-10] = 1e-10
-        abs_draw[pres_draw < 1e-10] = 1e-10
-    else:
-        if pres_draw < 1e-10:
-            pres_draw = 1e-10
-        if abs_draw < 1e-10:
-            abs_draw = 1e-10
+    # if isinstance(x, np.ndarray):
+    #     pres_draw[pres_draw < 1e-10] = 1e-10
+    #     abs_draw[pres_draw < 1e-10] = 1e-10
+    # else:
+    #     if pres_draw < 1e-10:
+    #         pres_draw = 1e-10
+    #     if abs_draw < 1e-10:
+    #         abs_draw = 1e-10
 
     log_given_pres = np.log(g_t) + np.log(pres_draw)
     log_normalizer = np.log((g_t * pres_draw + (1-g_t) * abs_draw))
@@ -120,14 +124,25 @@ def get_rootgrid(sigma, mu):
     rootgrid = np.zeros((size, size, 2))  # NxN grid of values for g_t, g_tp1
     for i in range(size):
         g_t = g_values[i]
+        if sigma[1] < sigma[0]:
+            peakval = np.amax(f(testx, g_t, sigma, mu))
+        elif sigma[0] < sigma[1]:
+            peakval = np.amin(f(testx, g_t, sigma, mu))
         for j in range(size):
             g_tp1 = g_values[j]
-            try:
+            if sigma[1] < sigma[0] and g_tp1 > peakval:
+                skiproot = True
+            elif sigma[0] < sigma[1] and g_tp1 < peakval:
+                skiproot = True
+            else:
+                skiproot = False
+
+            if not skiproot:
                 rootgrid[i, j, 0] = brentq(
                     lambda x: g_tp1 - f(x, g_t, sigma, mu), -50, ourpeak)
                 rootgrid[i, j, 1] = brentq(
                     lambda x: g_tp1 - f(x, g_t, sigma, mu), ourpeak, 50)
-            except ValueError:
+            elif skiproot:
                 if g_t >= g_tp1:
                     rootgrid[i, j, 0] = -50
                     rootgrid[i, j, 1] = -50
@@ -179,6 +194,7 @@ def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
                                               decision_vals[i, 0], decision_vals[i, 1]))
     return V_full, decisions
 
+
 def solve_rho(reward, sigma, mu, roots):
     '''
     Root finding procedure to find rho given the constrain V(t=0)=0.
@@ -187,13 +203,13 @@ def solve_rho(reward, sigma, mu, roots):
     '''
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
-        print(rho)
         values = back_induct(reward, 0, rho, sigma, mu, roots)[0]
         return values[int(size/2), 0]
 
-    opt_log_rho = brentq(V_in_rho, -5, np.log(reward+0.1))
+    opt_log_rho = brentq(V_in_rho, -5, np.log(100 * reward))
 
     return np.exp(opt_log_rho)
+
 
 def get_rt(sigma, mu, decisions):
     numsims = 2000
@@ -274,6 +290,7 @@ def get_data_likelihood(sub_data, sigma):
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
+        rho = solve_rho(reward, sigma, mu, rootgrid)
         decisions = back_induct(reward, punishment, rho, sigma, mu, rootgrid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
         likelihood += get_single_N_likelihood(data[i], sim_rt, 1)
@@ -286,7 +303,7 @@ if __name__ == '__main__':
         return get_data_likelihood(sub_data, log_sigma)
 
     bnds = np.array(((-1.7, 1.),))  # [n_samples, 2] shaped array with bounds
-    x_opt = bayesian_optimisation(n_iters=100, sample_loss=subject_likelihood,
+    x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
                                   bounds=bnds, n_pre_samples=15)
 
     xp, yp = x_opt
@@ -316,6 +333,7 @@ if __name__ == '__main__':
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
+        rho = solve_rho(reward, sigma, mu, rootgrid)
         decisions = back_induct(reward, punishment, rho, sigma, mu, rootgrid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
 
