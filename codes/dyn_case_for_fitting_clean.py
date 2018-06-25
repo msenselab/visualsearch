@@ -88,10 +88,12 @@ def f(x, g_t, sigma, mu):
     pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
     abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
 
-    log_given_pres = np.log(g_t) + np.log(pres_draw)
-    log_normalizer = np.log((g_t * pres_draw + (1-g_t) * abs_draw))
+    post = (g_t * pres_draw) / (g_t * pres_draw + (1 - g_t) * abs_draw)
 
-    post = np.exp(log_given_pres - log_normalizer)
+    if sigma[0] < sigma[1]:
+        post[np.invert(np.isfinite(post))] = 1.
+    elif sigma[1] < sigma[0]:
+        post[np.invert(np.isfinite(post))] = 0.
 
     return post
 
@@ -117,20 +119,16 @@ def get_rootgrid(sigma, mu):
     testx = np.linspace(-50, 50, 1000)
     testeval = f(testx, 0.5, sigma, mu)
     if sigma[1] < sigma[0]:
-        testeval[np.invert(np.isfinite(testeval))] = 0.
         ourpeak = testx[np.argmax(testeval)]
     elif sigma[0] < sigma[1]:
-        testeval[np.invert(np.isfinite(testeval))] = 1.
         ourpeak = testx[np.argmin(testeval)]
     rootgrid = np.zeros((size, size, 2))  # NxN grid of values for g_t, g_tp1
     for i in range(size):
         g_t = g_values[i]
         testeval_gt = f(testx, g_t, sigma, mu)
         if sigma[1] < sigma[0]:
-            testeval_gt[np.invert(np.isfinite(testeval_gt))] = 0.
             peakval = np.amax(testeval_gt)
         elif sigma[0] < sigma[1]:
-            testeval_gt[np.invert(np.isfinite(testeval_gt))] = 1.
             peakval = np.amin(testeval_gt)
         for j in range(size):
             g_tp1 = g_values[j]
@@ -146,8 +144,10 @@ def get_rootgrid(sigma, mu):
                     return g_tp1 - f(x, g_t, sigma, mu)
                 testx_neg = np.linspace(-50, ourpeak, 1000)
                 testx_pos = np.linspace(ourpeak, 50, 1000)
-                rootgrid[i, j, 0] = testx_neg[np.argmin(np.abs(rootfunc(testx_neg)))]
-                rootgrid[i, j, 1] = testx_pos[np.argmin(np.abs(rootfunc(testx_pos)))]
+                testeval_neg = rootfunc(testx_neg)
+                testeval_pos = rootfunc(testx_pos)
+                rootgrid[i, j, 0] = testx_neg[np.argmin(np.abs(testeval_neg))]
+                rootgrid[i, j, 1] = testx_pos[np.argmin(np.abs(testeval_pos))]
             elif skiproot:
                 if g_t >= g_tp1:
                     rootgrid[i, j, 0] = -50
