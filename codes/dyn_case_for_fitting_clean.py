@@ -115,10 +115,13 @@ def simulate_observer(arglist):
 
 def get_rootgrid(sigma, mu):
     testx = np.linspace(-50, 50, 1000)
+    testeval = f(testx, 0.5, sigma, mu)
     if sigma[1] < sigma[0]:
-        ourpeak = testx[np.argmax(f(testx, 0.5, sigma, mu))]
+        testeval[np.invert(np.isfinite(testeval))] = 0.
+        ourpeak = testx[np.argmax(testeval)]
     elif sigma[0] < sigma[1]:
-        ourpeak = testx[np.argmin(f(testx, 0.5, sigma, mu))]
+        testeval[np.invert(np.isfinite(testeval))] = 1.
+        ourpeak = testx[np.argmin(testeval)]
     rootgrid = np.zeros((size, size, 2))  # NxN grid of values for g_t, g_tp1
     for i in range(size):
         g_t = g_values[i]
