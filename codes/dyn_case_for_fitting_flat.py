@@ -13,7 +13,7 @@ from scipy.stats import gaussian_kde, norm
 import pandas as pd
 from pathlib import Path
 from gauss_opt import bayesian_optimisation
-from dynamic_adhoc_twosigma import p_new_ev, posterior
+from dyn_case_fns import d_map, sample_epsilon, posterior, p_new_ev, f
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -49,18 +49,6 @@ temp = np.mean(np.array(exp1['rt']))
 sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
 
 
-def d_map(N, epsilons, fine_sigma):
-    return -(1 / (2 * fine_sigma**2)) + np.log(1 / N) + \
-        np.log(np.sum(np.exp(epsilons / fine_sigma**2)))
-
-
-def sample_epsilon(C, N, fine_sigma):
-    epsilons = np.random.normal(0, fine_sigma, N)
-    if C == 1:
-        epsilons[0] = np.random.normal(1, fine_sigma)
-    return epsilons
-
-
 def get_coarse_stats(fine_sigma, num_samples):
     '''
     returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats
@@ -78,24 +66,6 @@ def get_coarse_stats(fine_sigma, num_samples):
         stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
                              [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
     return stats
-
-
-def f(x, g_t, sigma, mu):
-    ''' x_(t + 1) is x
-    Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
-    the appropriate g_(t+1) as an output for a single value of x_(t+1)
-    '''
-    pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
-    abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
-
-    post = (g_t * pres_draw) / (g_t * pres_draw + (1 - g_t) * abs_draw)
-
-    if sigma[0] < sigma[1]:
-        post[np.invert(np.isfinite(post))] = 1.
-    elif sigma[1] < sigma[0]:
-        post[np.invert(np.isfinite(post))] = 0.
-
-    return post
 
 
 def simulate_observer(arglist):
@@ -176,6 +146,7 @@ def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
 
     # Corresponding array to store the identity of decisions made
     decisions = np.zeros((size, int(T / dt)))
+    decisions[:, -1] = np.argmax(decision_vals, axis=1)
 
     # Backwards induction
     for index in range(2, int(T / dt) + 1):
