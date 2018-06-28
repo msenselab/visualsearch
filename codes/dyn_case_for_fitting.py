@@ -98,23 +98,6 @@ def f(x, g_t, sigma, mu):
     return post
 
 
-def simulate_observer(arglist):
-    C, decisions, sigma, mu, dt = arglist
-    step = 0
-    t = 0
-    g_t = np.ones(int(T / dt)) * 0.5
-    while t < (T - dt):
-        step += 1
-        t = step * dt
-        x_t = np.random.normal(mu[C], sigma[C]) * dt
-        g_t[step] = posterior(x_t, g_t[step - 1], C, sigma, mu)
-        nearest_grid = np.abs(g_values - g_t[step]).argmin()
-        decision_t = decisions[nearest_grid, step]
-        if decision_t != 0:
-            break
-    return (decision_t, t, g_t)
-
-
 def get_rootgrid(sigma, mu):
     testx = np.linspace(-50, 50, 1000)
     testeval = f(testx, 0.5, sigma, mu)
@@ -164,23 +147,23 @@ def p_new_ev(x, g_t, sigma, mu):
     p_abs = norm.pdf(x, loc = mu[0], scale = sigma[0])
     return p_pres * g_t + p_abs * (1 - g_t)
 
+
 def update_probs(rootgrid, sigma, mu):
-    '''
-    returns a size x size matrix, where column i denotes the probability of an
-    update from given g_t to all potential future g_t+1
-    '''
-    probs_grid = np.zeros((size, size))
+    prob_grid = np.zeros((size, size))
     for i in range(size):
-        g_t = g_values[i]
-        roots = rootgrid[i, : , :]
+        g_t = g_values[i]  # Pick ith value of g at t
+        # Slice roots of our given g_t across all g_(t+1)
+        roots = rootgrid[i, :, :]
+        # Find the likelihood of roots x_(t+1)
         new_g_probs = p_new_ev(roots, g_t, sigma, mu)
         new_g_probs = new_g_probs / np.sum(new_g_probs)  # Normalize
         new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
-        probs_grid[:, i] = new_g_probs
+        prob_grid[:, i] = new_g_probs
+    return prob_grid
 
-    return probs_grid
+def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
 
-def back_induct(reward, punishment, rho, sigma, mu, probs_grid):
+    # Define the reward array
     R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
                   (punishment, reward)])  # (pres/abs, pres/pres) in form decision / actual
 
@@ -188,26 +171,30 @@ def back_induct(reward, punishment, rho, sigma, mu, probs_grid):
     # in advance
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
-    decision_vals[:, 1] = (g_values * R[1, 1] + (1 - g_values) * R[1, 0]) - rho * t_w  # resp pres
-    decision_vals[:, 0] = ((1 - g_values) * R[0, 0] + g_values * R[0, 1]) - rho * t_w  # resp abs
+    decision_vals[:, 1] = g_values * R[1, 1] + \
+        (1 - g_values) * R[1, 0] - (t_w+T)*rho # respond present
+    decision_vals[:, 0] = (1 - g_values) * R[0, 0] + \
+        g_values * R[0, 1] - (t_w+T)*rho  # respond absent
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
     # At large T we assume val of waiting is zero
     V_full[:, -1] = np.max(decision_vals, axis=1)
-
+    V_pause = np.zeros_like(V_full)
     # Corresponding array to store the identity of decisions made
     decisions = np.zeros((size, int(T / dt)))
-    decisions[:, -1] = np.argmax(decision_vals, axis=1)
+    decisions[:, -1] = np.argmax(decision_vals, axis=1)+1
 
     # Backwards induction
     for index in range(2, int(T / dt) + 1):
         tau = (index - 1) * dt
         t = T - tau
+        # print(t)
 
         for i in range(size):
             # Sum and subt op cost
-            V_wait = np.sum(probs_grid[:, i] * V_full[:, -(index - 1)]) - (rho * t)
+            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) - rho * t
+            V_pause[i, -index] = V_wait
             # Find the maximum value b/w waiting and two decision options. Store value and identity.
             V_full[i, -index] = np.amax((V_wait,
                                          decision_vals[i, 0], decision_vals[i, 1]))
@@ -216,7 +203,7 @@ def back_induct(reward, punishment, rho, sigma, mu, probs_grid):
     return V_full, decisions
 
 
-def solve_rho(reward, sigma, mu, roots):
+def solve_rho(reward, sigma, mu, prob_grid):
     '''
     Root finding procedure to find rho given the constrain V(t=0)=0.
     This criteria comes from the invariance of policy with
@@ -224,18 +211,34 @@ def solve_rho(reward, sigma, mu, roots):
     '''
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
-        values = back_induct(reward, punishment, rho, sigma, mu, roots)[0]
+        values = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[0]
         return values[int(size/2), 0]
 
     #when optimizing for reward this optimization should be accounted for in choosing bounds
     try:
-        opt_log_rho = brentq(V_in_rho, -0.1+np.log(reward), 0.1+np.log(reward))
+        opt_log_rho = brentq(V_in_rho, -5+np.log(reward), 5+np.log(reward))
     except ValueError:
         try: opt_log_rho = brentq(V_in_rho, -0.5+np.log(reward), 0.5+np.log(reward))
         except ValueError: raise Exception("chosen reward too small")
 
     return np.exp(opt_log_rho)
 
+
+def simulate_observer(arglist):
+    C, decisions, sigma, mu, dt = arglist
+    step = 0
+    t = 0
+    g_t = np.ones(int(T / dt)) * 0.5
+    while t < (T - dt):
+        step += 1
+        t = step * dt
+        x_t = np.random.normal(mu[C], sigma[C]) * dt
+        g_t[step] = posterior(x_t, g_t[step - 1], C, sigma, mu)
+        nearest_grid = np.abs(g_values - g_t[step]).argmin()
+        decision_t = decisions[nearest_grid, step]
+        if decision_t != 0:
+            break
+    return (decision_t, t, g_t)
 
 def get_rt(sigma, mu, decisions):
     numsims = 2000
