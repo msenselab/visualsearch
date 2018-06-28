@@ -13,7 +13,7 @@ from scipy.stats import gaussian_kde, norm
 import pandas as pd
 from pathlib import Path
 from gauss_opt import bayesian_optimisation
-from dynamic_adhoc_twosigma import p_new_ev, posterior
+from dynamic_adhoc_twosigma import posterior
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -157,8 +157,30 @@ def get_rootgrid(sigma, mu):
                     rootgrid[i, j, 1] = 50
     return rootgrid
 
+def p_new_ev(x, g_t, sigma, mu):
+    ''' The probability of a given observation x_(t+1) given our current belief
+    g_t'''
+    p_pres = norm.pdf(x, loc =  mu[1], scale = sigma[1])
+    p_abs = norm.pdf(x, loc = mu[0], scale = sigma[0])
+    return p_pres * g_t + p_abs * (1 - g_t)
 
-def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
+def update_probs(rootgrid, sigma, mu):
+    '''
+    returns a size x size matrix, where column i denotes the probability of an
+    update from given g_t to all potential future g_t+1
+    '''
+    probs_grid = np.zeros((size, size))
+    for i in range(size):
+        g_t = g_values[i]
+        roots = rootgrid[i, : , :]
+        new_g_probs = p_new_ev(roots, g_t, sigma, mu)
+        new_g_probs = new_g_probs / np.sum(new_g_probs)  # Normalize
+        new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
+        probs_grid[:, i] = new_g_probs
+
+    return probs_grid
+
+def back_induct(reward, punishment, rho, sigma, mu, probs_grid):
     R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
                   (punishment, reward)])  # (pres/abs, pres/pres) in form decision / actual
 
@@ -184,16 +206,8 @@ def back_induct(reward, punishment, rho, sigma, mu, rootgrid):
         t = T - tau
 
         for i in range(size):
-            g_t = g_values[i]  # Pick ith value of g at t
-            # Slice roots of our given g_t across all g_(t+1)
-            roots = rootgrid[i, :, :]
-            # Find the likelihood of roots x_(t+1)
-            new_g_probs = p_new_ev(roots, g_t, sigma, mu)
-            new_g_probs = new_g_probs / np.sum(new_g_probs)  # Normalize
-            new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
             # Sum and subt op cost
-            V_wait = np.sum(new_g_probs * V_full[:, -(index - 1)]) - rho * t
-
+            V_wait = np.sum(probs_grid[:, i] * V_full[:, -(index - 1)]) - (rho * t)
             # Find the maximum value b/w waiting and two decision options. Store value and identity.
             V_full[i, -index] = np.amax((V_wait,
                                          decision_vals[i, 0], decision_vals[i, 1]))
