@@ -312,8 +312,8 @@ def get_single_N_likelihood(data, sim_rt, reward):
     return -np.sum(np.log(likelihood_pertrial))
 
 
-def get_data_likelihood(reward, sub_data, sigma):
-    sigma = np.exp(sigma)
+def get_data_likelihood(reward, sub_data, log_sigma):
+    sigma = np.exp(log_sigma)
     print(sigma)
     likelihood = 0
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
@@ -342,7 +342,8 @@ if __name__ == '__main__':
     #sig_reward; fits fine grained sigma and reward per subject
 
     if model_type == 'sig':
-        def subject_likelihood(log_sigma):
+        def subject_likelihood(params):
+            log_sigma = params[0]
             return get_data_likelihood(1, sub_data, log_sigma)
 
         bnds = np.array(((-1.7, 1.),))  # [n_variables, 2] shaped array with bounds
@@ -350,11 +351,11 @@ if __name__ == '__main__':
                                       bounds=bnds, n_pre_samples=15)
     if model_type == 'sig_reward':
         def subject_likelihood(params):
-            reward = params[0]
-            log_sigma = params[1]
+            log_sigma = params[0]
+            reward = params[1]
             return get_data_likelihood(reward, sub_data, log_sigma)
 
-        bnds = np.array(((0.,10.),(-1.7, 1.)))  # [n_variables, 2] shaped array with bounds
+        bnds = np.array(((-1.7, 1.), (0.,10.)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
 
@@ -375,13 +376,18 @@ if __name__ == '__main__':
     # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
     fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
-    best_logsig = datarr[np.argmin(yp), 0]
-    best_sigma = np.exp(best_logsig)
+    best_params = datarr[np.argmin(yp), 0]
+    best_sigma = np.exp(best_params[0])
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
 
     stats = get_coarse_stats(best_sigma, d_map_samples)
     for i in range(stats.shape[0]):
+        if model_type == 'sig':
+            reward = 1
+        elif model_type == 'sig_reward':
+            reward = best_params[1]
+
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
