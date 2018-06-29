@@ -97,7 +97,6 @@ def f(x, g_t, sigma, mu):
 
     return post
 
-
 def get_rootgrid(sigma, mu):
     testx = np.linspace(-50, 50, 1000)
     testeval = f(testx, 0.5, sigma, mu)
@@ -106,18 +105,15 @@ def get_rootgrid(sigma, mu):
     elif sigma[0] < sigma[1]:
         ourpeak = testx[np.argmin(testeval)]
     rootgrid = np.zeros((size, size, 2))  # NxN grid of values for g_t, g_tp1
+
     for i in range(size):
         g_t = g_values[i]
-        testeval_gt = f(testx, g_t, sigma, mu)
-        if sigma[1] < sigma[0]:
-            peakval = np.amax(testeval_gt)
-        elif sigma[0] < sigma[1]:
-            peakval = np.amin(testeval_gt)
+
         for j in range(size):
             g_tp1 = g_values[j]
-            if sigma[1] < sigma[0] and g_tp1 > peakval:
+            if sigma[1] < sigma[0] and g_tp1 < g_t:
                 skiproot = True
-            elif sigma[0] < sigma[1] and g_tp1 < peakval:
+            elif sigma[0] < sigma[1] and g_tp1 > g_t:
                 skiproot = True
             else:
                 skiproot = False
@@ -216,9 +212,9 @@ def solve_rho(reward, sigma, mu, prob_grid):
 
     #when optimizing for reward this optimization should be accounted for in choosing bounds
     try:
-        opt_log_rho = brentq(V_in_rho, -5+np.log(reward), 5+np.log(reward))
+        opt_log_rho = brentq(V_in_rho, -5+np.log(reward), -1 + np.log(reward))
     except ValueError:
-        try: opt_log_rho = brentq(V_in_rho, -0.5+np.log(reward), 0.5+np.log(reward))
+        try: opt_log_rho = brentq(V_in_rho, -5+np.log(reward), np.log(reward))
         except ValueError: raise Exception("chosen reward too small")
 
     return np.exp(opt_log_rho)

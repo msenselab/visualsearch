@@ -13,7 +13,7 @@ from scipy.stats import gaussian_kde, norm
 import pandas as pd
 from pathlib import Path
 from gauss_opt import bayesian_optimisation
-from dyn_case_fns import d_map, sample_epsilon, posterior, f
+from dyn_case_fns import d_map, sample_epsilon, posterior
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -85,6 +85,24 @@ def simulate_observer(arglist):
     return (decision_t, t, g_t)
 
 
+def f(x, g_t, sigma, mu):
+    ''' x_(t + 1) is x
+    Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
+    the appropriate g_(t+1) as an output for a single value of x_(t+1)
+    '''
+    pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
+    abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
+
+    post = (g_t * pres_draw) / (g_t * pres_draw + (1 - g_t) * abs_draw)
+
+    if sigma[0] < sigma[1]:
+        post[np.invert(np.isfinite(post))] = 1.
+    elif sigma[1] < sigma[0]:
+        post[np.invert(np.isfinite(post))] = 0.
+
+    return post
+
+
 def get_rootgrid(sigma, mu):
     testx = np.linspace(-50, 50, 1000)
     testeval = f(testx, 0.5, sigma, mu)
@@ -97,19 +115,24 @@ def get_rootgrid(sigma, mu):
         g_t = g_values[i]
         testeval_gt = f(testx, g_t, sigma, mu)
         if sigma[1] < sigma[0]:
-            peakval = np.amax(testeval_gt)
+            peak = np.amax(testeval_gt)
         elif sigma[0] < sigma[1]:
-            peakval = np.amin(testeval_gt)
+            peak = np.amin(testeval_gt)
         for j in range(size):
             g_tp1 = g_values[j]
-            if sigma[1] < sigma[0] and g_tp1 > peakval:
+            if sigma[1] < sigma[0] and g_tp1 > peak:
                 skiproot = True
-            elif sigma[0] < sigma[1] and g_tp1 < peakval:
+            elif sigma[0] < sigma[1] and g_tp1 < peak:
                 skiproot = True
             else:
                 skiproot = False
 
             if not skiproot:
+                # def root(x):
+                #     x = np.array([x])
+                #     return g_tp1 - f(x, g_t, sigma, mu)
+                # rootgrid[i, j, 0] = brentq(root, -50, ourpeak)
+                # rootgrid[i, j, 1] = brentq(root, ourpeak, 50)
                 def rootfunc(x):
                     return g_tp1 - f(x, g_t, sigma, mu)
                 testx_neg = np.linspace(-50, ourpeak, 1000)
@@ -160,18 +183,18 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
     decision_vals[:, 1] = g_values * R[1, 1] + \
-        (1 - g_values) * R[1, 0]  # respond present
+        (1 - g_values) * R[1, 0] - (t_w+T)*rho # respond present
     decision_vals[:, 0] = (1 - g_values) * R[0, 0] + \
-        g_values * R[0, 1]  # respond absent
+        g_values * R[0, 1] - (t_w+T)*rho  # respond absent
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
     # At large T we assume val of waiting is zero
     V_full[:, -1] = np.max(decision_vals, axis=1)
-
+    V_pause = np.zeros_like(V_full)
     # Corresponding array to store the identity of decisions made
     decisions = np.zeros((size, int(T / dt)))
-    decisions[:, -1] = np.argmax(decision_vals)+1
+    decisions[:, -1] = np.argmax(decision_vals, axis=1)+1
 
     # Backwards induction
     for index in range(2, int(T / dt) + 1):
@@ -182,6 +205,7 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
         for i in range(size):
             # Sum and subt op cost
             V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) - rho * t
+            V_pause[i, -index] = V_wait
             # Find the maximum value b/w waiting and two decision options. Store value and identity.
             V_full[i, -index] = np.amax((V_wait,
                                          decision_vals[i, 0], decision_vals[i, 1]))
@@ -190,7 +214,7 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     return V_full, decisions
 
 
-def solve_rho(reward, sigma, mu, roots):
+def solve_rho(reward, sigma, mu, prob_grid):
     '''
     Root finding procedure to find rho given the constrain V(t=0)=0.
     This criteria comes from the invariance of policy with
@@ -198,7 +222,7 @@ def solve_rho(reward, sigma, mu, roots):
     '''
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
-        values = back_induct(reward, punishment, rho, sigma, mu, roots)[0]
+        values = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[0]
         return values[int(size/2), 0]
 
     #when optimizing for reward this optimization should be accounted for in choosing bounds
