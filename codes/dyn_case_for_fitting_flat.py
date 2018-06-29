@@ -128,11 +128,6 @@ def get_rootgrid(sigma, mu):
                 skiproot = False
 
             if not skiproot:
-                # def root(x):
-                #     x = np.array([x])
-                #     return g_tp1 - f(x, g_t, sigma, mu)
-                # rootgrid[i, j, 0] = brentq(root, -50, ourpeak)
-                # rootgrid[i, j, 1] = brentq(root, ourpeak, 50)
                 def rootfunc(x):
                     return g_tp1 - f(x, g_t, sigma, mu)
                 testx_neg = np.linspace(-50, ourpeak, 1000)

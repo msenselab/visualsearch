@@ -97,6 +97,7 @@ def f(x, g_t, sigma, mu):
 
     return post
 
+
 def get_rootgrid(sigma, mu):
     testx = np.linspace(-50, 50, 1000)
     testeval = f(testx, 0.5, sigma, mu)
@@ -108,18 +109,24 @@ def get_rootgrid(sigma, mu):
 
     for i in range(size):
         g_t = g_values[i]
-
+        testeval_gt = f(testx, g_t, sigma, mu)
+        if sigma[1] < sigma[0]:
+            peak = np.amax(testeval_gt)
+        elif sigma[0] < sigma[1]:
+            peak = np.amin(testeval_gt)
         for j in range(size):
             g_tp1 = g_values[j]
-            if sigma[1] < sigma[0] and g_tp1 < g_t:
+            if sigma[1] < sigma[0] and g_tp1 > peak:
                 skiproot = True
-            elif sigma[0] < sigma[1] and g_tp1 > g_t:
+            elif sigma[0] < sigma[1] and g_tp1 < peak:
                 skiproot = True
             else:
                 skiproot = False
 
             if not skiproot:
                 def rootfunc(x):
+                    if type(x) == float:
+                        x = np.array([x])
                     return g_tp1 - f(x, g_t, sigma, mu)
                 testx_neg = np.linspace(-50, ourpeak, 1000)
                 testx_pos = np.linspace(ourpeak, 50, 1000)
@@ -136,11 +143,12 @@ def get_rootgrid(sigma, mu):
                     rootgrid[i, j, 1] = 50
     return rootgrid
 
+
 def p_new_ev(x, g_t, sigma, mu):
     ''' The probability of a given observation x_(t+1) given our current belief
     g_t'''
-    p_pres = norm.pdf(x, loc =  mu[1], scale = sigma[1])
-    p_abs = norm.pdf(x, loc = mu[0], scale = sigma[0])
+    p_pres = norm.pdf(x, loc=mu[1], scale=sigma[1])
+    p_abs = norm.pdf(x, loc=mu[0], scale=sigma[0])
     return p_pres * g_t + p_abs * (1 - g_t)
 
 
@@ -157,6 +165,7 @@ def update_probs(rootgrid, sigma, mu):
         prob_grid[:, i] = new_g_probs
     return prob_grid
 
+
 def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
 
     # Define the reward array
@@ -168,7 +177,7 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
     decision_vals[:, 1] = g_values * R[1, 1] + \
-        (1 - g_values) * R[1, 0] - (t_w+T)*rho # respond present
+        (1 - g_values) * R[1, 0] - (t_w+T)*rho  # respond present
     decision_vals[:, 0] = (1 - g_values) * R[0, 0] + \
         g_values * R[0, 1] - (t_w+T)*rho  # respond absent
 
@@ -210,12 +219,14 @@ def solve_rho(reward, sigma, mu, prob_grid):
         values = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[0]
         return values[int(size/2), 0]
 
-    #when optimizing for reward this optimization should be accounted for in choosing bounds
+    # when optimizing for reward this optimization should be accounted for in choosing bounds
     try:
         opt_log_rho = brentq(V_in_rho, -5+np.log(reward), -1 + np.log(reward))
     except ValueError:
-        try: opt_log_rho = brentq(V_in_rho, -5+np.log(reward), np.log(reward))
-        except ValueError: raise Exception("chosen reward too small")
+        try:
+            opt_log_rho = brentq(V_in_rho, -5+np.log(reward), np.log(reward))
+        except ValueError:
+            raise Exception("chosen reward too small")
 
     return np.exp(opt_log_rho)
 
@@ -235,6 +246,7 @@ def simulate_observer(arglist):
         if decision_t != 0:
             break
     return (decision_t, t, g_t)
+
 
 def get_rt(sigma, mu, decisions):
     numsims = 2000
