@@ -336,10 +336,13 @@ def get_data_likelihood(reward, sub_data, log_sigma):
 
 
 if __name__ == '__main__':
+
+
     model_type = 'sig_reward'
     #options are:
     #sig; fits just a fine grained sigma
     #sig_reward; fits fine grained sigma and reward per subject
+
 
     if model_type == 'sig':
         def subject_likelihood(params):
@@ -363,17 +366,20 @@ if __name__ == '__main__':
     # Pull out each of the log(sigma) that the optimizer tested and put them in an array together
     # with the associated log(likelihood). datarr is (N x 2) where N is the number of optimize samps
     datarr = np.array((x_opt[0].reshape(-1), x_opt[1])).T
-    sortdatarr = datarr[np.argsort(datarr[:, 0]), :]
 
-    # Plot test points and likelihoods
+#dont know how this sort will be effected with 1x2 xp output?
+
+    #sortdatarr = datarr[np.argsort(datarr[:, 0]), :]
+
+    # # Plot test points and likelihoods
     plt.figure()
-    plt.scatter(sortdatarr[:, 0], sortdatarr[:, 1])
-    plt.xlabel(r'$log(\sigma)$')
-    plt.ylabel(r'log(likelihood)')
-    plt.title('Subject {} Bayesian Opt tested points'.format(subject_num))
-
-    plt.savefig(savepath + '/subject_{}_bayes_opt_testpoints.png'.format(subject_num))
-    # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
+    # plt.scatter(sortdatarr[:, 0], sortdatarr[:, 1])
+    # plt.xlabel(r'$log(\sigma)$')
+    # plt.ylabel(r'log(likelihood)')
+    # plt.title('Subject {} Bayesian Opt tested points'.format(subject_num))
+    #
+    # plt.savefig(savepath + '/subject_{}_bayes_opt_testpoints.png'.format(subject_num))
+    # # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
     fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
     best_params = datarr[np.argmin(yp), 0]
