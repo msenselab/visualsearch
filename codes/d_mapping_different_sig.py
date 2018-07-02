@@ -38,15 +38,16 @@ def sim(fine_sigma, num_change, N):
     sim_data_abs = []
     for j in range(num_change):
         length = np.random.uniform(0, 1, size = N)
-        sigma = length**2 * fine_sigma
+        length = length /np.sum(length)
+        sigma = fine_sigma*length**2
         for i in range(200):
             sim_data_pres.append(d_map_alt(N, sample_epsilon_alt(1, N, fine_sigma), sigma))
-            sim_data_abs.append(d_map_alt(N, sample_epsilon_alt(1, N, fine_sigma), sigma))
+            sim_data_abs.append(d_map_alt(N, sample_epsilon_alt(0, N, fine_sigma), sigma))
     return sim_data_pres, sim_data_abs
 
 fine_sigma = 5
 
-sim_data_8 = sim(fine_sigma, 50, 8)
+sim_data_8 = sim(fine_sigma, 200, 8)
 #sim_data_12 = sim(fine_sigma, 500, 12)
 #sim_data_16 = sim(fine_sigma, 500, 16)
 

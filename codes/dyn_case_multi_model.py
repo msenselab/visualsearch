@@ -346,7 +346,7 @@ if __name__ == '__main__':
     if model_type == 'sig':
         def subject_likelihood(params):
             log_sigma = params[0]
-            return get_data_likelihood(1, sub_data, log_sigma)
+            return get_data_likelihood(0, sub_data, log_sigma)
 
         bnds = np.array(((-1.7, 1.),))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
@@ -393,7 +393,7 @@ if __name__ == '__main__':
             reward = 1
         elif model_type == 'sig_reward':
             reward = np.exp(best_params[1])
-
+        print(reward)
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
