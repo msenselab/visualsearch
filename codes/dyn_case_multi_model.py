@@ -184,7 +184,6 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     V_full = np.zeros((size, int(T / dt)))
     # At large T we assume val of waiting is zero
     V_full[:, -1] = np.max(decision_vals, axis=1)
-    V_pause = np.zeros_like(V_full)
     # Corresponding array to store the identity of decisions made
     decisions = np.zeros((size, int(T / dt)))
     decisions[:, -1] = np.argmax(decision_vals, axis=1)+1
@@ -197,8 +196,7 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
 
         for i in range(size):
             # Sum and subt op cost
-            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) - (rho+0.03) * t
-            V_pause[i, -index] = V_wait
+            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) - rho * t
             # Find the maximum value b/w waiting and two decision options. Store value and identity.
             V_full[i, -index] = np.amax((V_wait,
                                          decision_vals[i, 0], decision_vals[i, 1]))
@@ -383,7 +381,8 @@ if __name__ == '__main__':
     # # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
     fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
-    best_params = datarr[np.argmin(yp), 0]
+    #best_params = datarr[np.argmin(yp), 0]
+    best_params = xp[np.argmin(yp)]
     best_sigma = np.exp(best_params[0])
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
@@ -393,7 +392,7 @@ if __name__ == '__main__':
         if model_type == 'sig':
             reward = 1
         elif model_type == 'sig_reward':
-            reward = best_params[1]
+            reward = np.exp(best_params[1])
 
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
