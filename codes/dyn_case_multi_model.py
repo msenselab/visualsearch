@@ -346,7 +346,8 @@ if __name__ == '__main__':
     if model_type == 'sig':
         def subject_likelihood(params):
             log_sigma = params[0]
-            return get_data_likelihood(0, sub_data, log_sigma)
+            log_reward = 0
+            return get_data_likelihood(log_reward, sub_data, log_sigma)
 
         bnds = np.array(((-1.7, 1.),))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
