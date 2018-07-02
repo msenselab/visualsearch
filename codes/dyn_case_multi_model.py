@@ -9,6 +9,8 @@ import itertools as it
 import seaborn as sns
 from scipy.optimize import brentq
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.animation import FuncAnimation, writers
 from scipy.stats import gaussian_kde, norm
 import pandas as pd
 from pathlib import Path
@@ -335,19 +337,15 @@ def get_data_likelihood(log_reward, sub_data, log_sigma):
 
 
 if __name__ == '__main__':
-
-
     model_type = 'sig_reward'
-    #options are:
-    #sig; fits just a fine grained sigma
-    #sig_reward; fits fine grained sigma and reward per subject
-
+    '''options are:
+    sig; fits just a fine grained sigma
+    sig_reward; fits fine grained sigma and reward per subject'''
 
     if model_type == 'sig':
         def subject_likelihood(params):
             log_sigma = params[0]
-            log_reward = 0
-            return get_data_likelihood(log_reward, sub_data, log_sigma)
+            return get_data_likelihood(1, sub_data, log_sigma)
 
         bnds = np.array(((-1.7, 1.),))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
@@ -358,7 +356,7 @@ if __name__ == '__main__':
             log_reward = params[1]
             return get_data_likelihood(log_reward, sub_data, log_sigma)
 
-        bnds = np.array(((-1.7, 1.), (-3.,3.)))  # [n_variables, 2] shaped array with bounds
+        bnds = np.array(((-1.7, 1.), (-3., 3.)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
 
@@ -367,22 +365,31 @@ if __name__ == '__main__':
     # with the associated log(likelihood). datarr is (N x 2) where N is the number of optimize samps
     datarr = np.array((x_opt[0].reshape(-1), x_opt[1])).T
 
-#dont know how this sort will be effected with 1x2 xp output?
+    # dont know how this sort will be effected with 1x2 xp output?
 
-    #sortdatarr = datarr[np.argsort(datarr[:, 0]), :]
+    # sortdatarr = datarr[np.argsort(datarr[:, 0]), :]
 
     # # Plot test points and likelihoods
-    plt.figure()
-    # plt.scatter(sortdatarr[:, 0], sortdatarr[:, 1])
-    # plt.xlabel(r'$log(\sigma)$')
-    # plt.ylabel(r'log(likelihood)')
-    # plt.title('Subject {} Bayesian Opt tested points'.format(subject_num))
-    #
-    # plt.savefig(savepath + '/subject_{}_bayes_opt_testpoints.png'.format(subject_num))
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(xp[:, 0], xp[:, 1], yp, s=100)
+    ax.set_xlabel('$log(\sigma)$')
+    ax.set_ylabel('$log(reward)$')
+    ax.set_zlabel('$log(likelihood)$')
+
+    def anim_update(i):
+        ax.azim = (i / 540) * 360
+        plt.draw()
+        return
+
+    Writer = writers['ffmpeg']
+    writer = Writer(fps=60, bitrate=1800)
+    anim = FuncAnimation(fig, anim_update, frames=360)
+    anim.save(savepath + '/subject_{}_bayes_opt_testpoints.mp4'.format(subject_num), writer=writer)
+
     # # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
     fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
-    #best_params = datarr[np.argmin(yp), 0]
     best_params = xp[np.argmin(yp)]
     best_sigma = np.exp(best_params[0])
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
@@ -394,12 +401,13 @@ if __name__ == '__main__':
             reward = 1
         elif model_type == 'sig_reward':
             reward = np.exp(best_params[1])
-        print(reward)
+
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
-        rho = solve_rho(reward, sigma, mu, rootgrid)
-        decisions = back_induct(reward, punishment, rho, sigma, mu, rootgrid)[1]
+        prob_grid = update_probs(rootgrid, sigma, mu)
+        rho = solve_rho(reward, sigma, mu, prob_grid)
+        decisions = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
 
         currdata = data[i]
