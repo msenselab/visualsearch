@@ -312,8 +312,9 @@ def get_single_N_likelihood(data, sim_rt, reward):
     return -np.sum(np.log(likelihood_pertrial))
 
 
-def get_data_likelihood(reward, sub_data, log_sigma):
+def get_data_likelihood(log_reward, sub_data, log_sigma):
     sigma = np.exp(log_sigma)
+    reward = np.exp(log_reward)
     print(sigma)
     likelihood = 0
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
@@ -355,10 +356,10 @@ if __name__ == '__main__':
     if model_type == 'sig_reward':
         def subject_likelihood(params):
             log_sigma = params[0]
-            reward = params[1]
-            return get_data_likelihood(reward, sub_data, log_sigma)
+            log_reward = params[1]
+            return get_data_likelihood(log_reward, sub_data, log_sigma)
 
-        bnds = np.array(((-1.7, 1.), (0.,10.)))  # [n_variables, 2] shaped array with bounds
+        bnds = np.array(((-1.7, 1.), (-3.,3.)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
 

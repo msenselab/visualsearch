@@ -27,26 +27,28 @@ def sample_epsilon(C, N, sigma):
 
 def sample_epsilon_alt(C, N, sigma):
     for i in range(N):
-        epsilons = np.random.normal(0, sigma[i], N)
+        epsilons = np.random.normal(0, sigma, N)
     if C == 1:
-        epsilons[0] = np.random.normal(1, sigma[0])
+        epsilons[0] = np.random.normal(1, sigma)
     return epsilons
 
 
-def sim(num_change, N):
+def sim(fine_sigma, num_change, N):
     sim_data_pres = []
     sim_data_abs = []
     for j in range(num_change):
-        sigma = invgamma.rvs(1, size=N)
+        length = np.random.uniform(0, 1, size = N)
+        sigma = length**2 * fine_sigma
         for i in range(200):
-            sim_data_pres.append(d_map_alt(N, sample_epsilon_alt(1, N, sigma), sigma))
-            sim_data_abs.append(d_map_alt(N, sample_epsilon_alt(1, N, sigma), sigma))
+            sim_data_pres.append(d_map_alt(N, sample_epsilon_alt(1, N, fine_sigma), sigma))
+            sim_data_abs.append(d_map_alt(N, sample_epsilon_alt(1, N, fine_sigma), sigma))
     return sim_data_pres, sim_data_abs
 
+fine_sigma = 5
 
-sim_data_8 = sim(500, 8)
-sim_data_12 = sim(500, 12)
-sim_data_16 = sim(500, 16)
+sim_data_8 = sim(fine_sigma, 50, 8)
+#sim_data_12 = sim(fine_sigma, 500, 12)
+#sim_data_16 = sim(fine_sigma, 500, 16)
 
 
 # sim_data = np.zeros((10000, 2, 3))
@@ -78,6 +80,7 @@ sns.kdeplot(sim_data_8[1], bw=0.5)
 
 ax1.set_title("N=8")
 
+plt.show()
 
 ax2 = fig.add_subplot(132)
 
