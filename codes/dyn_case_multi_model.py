@@ -221,11 +221,12 @@ def solve_rho(reward, sigma, mu, prob_grid):
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
         values = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[0]
+        print(values[int(size / 2), 0])
         return values[int(size / 2), 0]
 
     # when optimizing for reward this optimization should be accounted for in choosing bounds
     try:
-        opt_log_rho = brentq(V_in_rho, -5 + np.log(reward), 5 + np.log(reward))
+        opt_log_rho = brentq(V_in_rho, -8 + np.log(reward), 3 + np.log(reward))
     except ValueError:
         try:
             opt_log_rho = brentq(V_in_rho, -5 + np.log(reward), np.log(reward))
@@ -336,7 +337,7 @@ def get_data_likelihood(log_reward, sub_data, log_sigma, power_law = False):
         rho = solve_rho(reward, sigma, mu, probs)
         decisions = back_induct(reward, punishment, rho, sigma, mu, probs)[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        likelihood += get_single_N_likelihood(data[i], sim_rt, 1)
+        likelihood += get_single_N_likelihood(data[i], sim_rt, reward)
 
     return likelihood
 
