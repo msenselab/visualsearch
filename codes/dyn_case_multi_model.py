@@ -14,6 +14,7 @@ from matplotlib.animation import FuncAnimation, writers
 from scipy.stats import gaussian_kde, norm
 import pandas as pd
 from pathlib import Path
+import pickle
 from gauss_opt import bayesian_optimisation
 from dynamic_adhoc_twosigma import posterior
 
@@ -357,7 +358,7 @@ if __name__ == '__main__':
             log_reward = params[1]
             return get_data_likelihood(log_reward, sub_data, log_sigma)
 
-        bnds = np.array(((-1.7, 1.), (-3., 3.)))  # [n_variables, 2] shaped array with bounds
+        bnds = np.array(((-1.7, 1.), (-6., 1.)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
 
@@ -396,6 +397,7 @@ if __name__ == '__main__':
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
 
+    all_rt = {}
     stats = get_coarse_stats(best_sigma, d_map_samples)
     for i in range(stats.shape[0]):
         if model_type == 'sig':
@@ -410,6 +412,7 @@ if __name__ == '__main__':
         rho = solve_rho(reward, sigma, mu, prob_grid)
         decisions = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
+        all_rt[N_array[i]] = sim_rt
 
         currdata = data[i]
         pres_rts_0 = currdata.query('resp == 2 & target == \'Present\'').rt.values
@@ -433,3 +436,9 @@ if __name__ == '__main__':
             ax.set_xlim([0, 6])
 
     plt.savefig(savepath + '/subject_{}_bayes_opt_bestfits.png'.format(subject_num))
+
+    fw = open(savepath + '/subject_{}_simrt_and_params.p', 'wb')
+    outdict = {'best_sigma': best_params[0], 'best_reward': best_params[1], 'sim_rts': all_rt,
+               'coarse_stats': stats}
+    pickle.dump(outdict, fw)
+    fw.close()
