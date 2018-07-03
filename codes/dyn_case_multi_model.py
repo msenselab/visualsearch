@@ -24,7 +24,7 @@ T = 10
 t_w = 1
 size = 100
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
-d_map_samples = int(1e4)
+d_map_samples = 2*int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
@@ -52,7 +52,6 @@ def d_map(N, epsilons, fine_sigma):
     return -(1 / (2 * fine_sigma**2)) + np.log(1 / N) + \
         np.log(np.sum(np.exp(epsilons / fine_sigma**2)))
 
-
 def sample_epsilon(C, N, fine_sigma):
     epsilons = np.random.normal(0, fine_sigma, N)
     if C == 1:
@@ -60,22 +59,29 @@ def sample_epsilon(C, N, fine_sigma):
     return epsilons
 
 
-def get_coarse_stats(fine_sigma, num_samples):
+def get_coarse_stats(fine_sigma, num_samples, power_law = False):
     '''
     returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats
     row 1 is the mean and row 2 is the sd
+    weight_f specifies the type of weighting given to individual
+    peices of evidence based ona virtual length from focal point
+    NA
     '''
     stats = np.zeros((len(N_array), 2, 2))
     for i in range(len(N_array)):
         N = N_array[i]
+        if power_law == True:
+            sigma = fine_sigma/np.sqrt(N)
+        elif power_law == False:
+            sigma = fine_sigma
         pres_samples = np.zeros(num_samples)
         abs_samples = np.zeros(num_samples)
         for j in range(num_samples):
-            pres_samples[j] = d_map(N, sample_epsilon(1, N, fine_sigma), fine_sigma)
-            abs_samples[j] = d_map(N, sample_epsilon(0, N, fine_sigma), fine_sigma)
-
+            pres_samples[j] = d_map(N, sample_epsilon(1, N, sigma), sigma)
+            abs_samples[j] = d_map(N, sample_epsilon(0, N, sigma), sigma)
         stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
                              [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
+    print(stats)
     return stats
 
 
@@ -192,7 +198,6 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     for index in range(2, int(T / dt) + 1):
         tau = (index - 1) * dt
         t = T - tau
-        # print(t)
 
         for i in range(size):
             # Sum and subt op cost
@@ -310,7 +315,7 @@ def get_single_N_likelihood(data, sim_rt, reward):
     return -np.sum(np.log(likelihood_pertrial))
 
 
-def get_data_likelihood(log_reward, sub_data, log_sigma):
+def get_data_likelihood(log_reward, sub_data, log_sigma, power_law = False):
     sigma = np.exp(log_sigma)
     reward = np.exp(log_reward)
     print(sigma)
@@ -318,7 +323,7 @@ def get_data_likelihood(log_reward, sub_data, log_sigma):
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
 
-    stats = get_coarse_stats(sigma, d_map_samples)
+    stats = get_coarse_stats(sigma, d_map_samples, power_law)
     # print(stats)
 
     for i in range(stats.shape[0]):
@@ -329,7 +334,7 @@ def get_data_likelihood(log_reward, sub_data, log_sigma):
         rho = solve_rho(reward, sigma, mu, probs)
         decisions = back_induct(reward, punishment, rho, sigma, mu, probs)[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        likelihood += get_single_N_likelihood(data[i], sim_rt, 1)
+        likelihood += get_single_N_likelihood(data[i], sim_rt, reward)
 
     return likelihood
 
@@ -337,11 +342,11 @@ def get_data_likelihood(log_reward, sub_data, log_sigma):
 if __name__ == '__main__':
 
 
-    model_type = 'sig_reward'
+    model_type = 'sig_reward_pow'
     #options are:
     #sig; fits just a fine grained sigma
     #sig_reward; fits fine grained sigma and reward per subject
-
+    #sig_reward_pow; fits fine grained sigma with variable precision for N
 
     if model_type == 'sig':
         def subject_likelihood(params):
@@ -361,6 +366,17 @@ if __name__ == '__main__':
         bnds = np.array(((-1.7, 1.), (-3.,3.)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
+
+    if model_type == 'sig_reward_pow':
+        def subject_likelihood(params):
+            log_sigma = params[0]
+            log_reward = params[1]
+            return get_data_likelihood(log_reward, sub_data, log_sigma, power_law = True)
+
+        bnds = np.array(((-0.7, 3.), (-3.,3.)))  # [n_variables, 2] shaped array with bounds
+        x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
+                                      bounds=bnds, n_pre_samples=15)
+
 
     xp, yp = x_opt
     # Pull out each of the log(sigma) that the optimizer tested and put them in an array together
@@ -398,8 +414,9 @@ if __name__ == '__main__':
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
-        rho = solve_rho(reward, sigma, mu, rootgrid)
-        decisions = back_induct(reward, punishment, rho, sigma, mu, rootgrid)[1]
+        probs = update_probs(rootgrid, sigma, mu)
+        rho = solve_rho(reward, sigma, mu, probs)
+        decisions = back_induct(reward, punishment, rho, sigma, mu, probs)[1]
         sim_rt = get_rt(sigma, mu, decisions)
 
         currdata = data[i]
