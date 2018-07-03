@@ -178,9 +178,9 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
     decision_vals[:, 1] = g_values * R[1, 1] + \
-        (1 - g_values) * R[1, 0] - (t_w+T) * rho  # respond present
+        (1 - g_values) * R[1, 0] - (t_w + T) * rho  # respond present
     decision_vals[:, 0] = (1 - g_values) * R[0, 0] + \
-        g_values * R[0, 1] - (t_w+T)*rho  # respond absent
+        g_values * R[0, 1] - (t_w + T) * rho  # respond absent
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
@@ -188,7 +188,7 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     V_full[:, -1] = np.max(decision_vals, axis=1)
     # Corresponding array to store the identity of decisions made
     decisions = np.zeros((size, int(T / dt)))
-    decisions[:, -1] = np.argmax(decision_vals, axis=1)+1
+    decisions[:, -1] = np.argmax(decision_vals, axis=1) + 1
 
     # Backwards induction
     for index in range(2, int(T / dt) + 1):
@@ -216,14 +216,14 @@ def solve_rho(reward, sigma, mu, prob_grid):
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
         values = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[0]
-        return values[int(size/2), 0]
+        return values[int(size / 2), 0]
 
     # when optimizing for reward this optimization should be accounted for in choosing bounds
     try:
-        opt_log_rho = brentq(V_in_rho, -5+np.log(reward), 5 + np.log(reward))
+        opt_log_rho = brentq(V_in_rho, -5 + np.log(reward), 5 + np.log(reward))
     except ValueError:
         try:
-            opt_log_rho = brentq(V_in_rho, -5+np.log(reward), np.log(reward))
+            opt_log_rho = brentq(V_in_rho, -5 + np.log(reward), np.log(reward))
         except ValueError:
             raise Exception("chosen reward too small")
 
@@ -338,6 +338,7 @@ def get_data_likelihood(log_reward, sub_data, log_sigma):
 
 if __name__ == '__main__':
     model_type = 'sig_reward'
+    iter_bayesian_opt = 30
     '''options are:
     sig; fits just a fine grained sigma
     sig_reward; fits fine grained sigma and reward per subject'''
@@ -357,7 +358,7 @@ if __name__ == '__main__':
             return get_data_likelihood(log_reward, sub_data, log_sigma)
 
         bnds = np.array(((-1.7, 1.), (-3., 3.)))  # [n_variables, 2] shaped array with bounds
-        x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
+        x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
 
     xp, yp = x_opt
