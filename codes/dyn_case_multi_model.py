@@ -63,7 +63,7 @@ def sample_epsilon(C, N, fine_sigma):
     return epsilons
 
 
-def get_coarse_stats(fine_sigma, num_samples):
+def get_coarse_stats(fine_sigma, num_samples, power_law = False):
     '''
     returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats
     row 1 is the mean and row 2 is the sd
@@ -71,11 +71,15 @@ def get_coarse_stats(fine_sigma, num_samples):
     stats = np.zeros((len(N_array), 2, 2))
     for i in range(len(N_array)):
         N = N_array[i]
+        if power_law == False:
+            sigma = fine_sigma
+        if power_law == True:
+            sigma = fine_sigma/np.sqrt(N)
         pres_samples = np.zeros(num_samples)
         abs_samples = np.zeros(num_samples)
         for j in range(num_samples):
-            pres_samples[j] = d_map(N, sample_epsilon(1, N, fine_sigma), fine_sigma)
-            abs_samples[j] = d_map(N, sample_epsilon(0, N, fine_sigma), fine_sigma)
+            pres_samples[j] = d_map(N, sample_epsilon(1, N, sigma), sigma)
+            abs_samples[j] = d_map(N, sample_epsilon(0, N, sigma), sigma)
 
         stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
                              [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
@@ -313,7 +317,7 @@ def get_single_N_likelihood(data, sim_rt, reward):
     return -np.sum(np.log(likelihood_pertrial))
 
 
-def get_data_likelihood(log_reward, sub_data, log_sigma):
+def get_data_likelihood(log_reward, sub_data, log_sigma, power_law = False):
     sigma = np.exp(log_sigma)
     reward = np.exp(log_reward)
     print(sigma)
@@ -321,7 +325,7 @@ def get_data_likelihood(log_reward, sub_data, log_sigma):
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
 
-    stats = get_coarse_stats(sigma, d_map_samples)
+    stats = get_coarse_stats(sigma, d_map_samples, power_law)
     # print(stats)
 
     for i in range(stats.shape[0]):
@@ -342,7 +346,8 @@ if __name__ == '__main__':
     iter_bayesian_opt = 30
     '''options are:
     sig; fits just a fine grained sigma
-    sig_reward; fits fine grained sigma and reward per subject'''
+    sig_reward; fits fine grained sigma and reward per subject
+    sig_reward_power; fits fine grained sigma and reward per subject with power law in d mapping'''
 
     if model_type == 'sig':
         def subject_likelihood(params):
@@ -359,6 +364,16 @@ if __name__ == '__main__':
             return get_data_likelihood(log_reward, sub_data, log_sigma)
 
         bnds = np.array(((-1.7, 1.), (-6., 1.)))  # [n_variables, 2] shaped array with bounds
+        x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
+                                      bounds=bnds, n_pre_samples=15)
+
+    if model_type == 'sig_reward_pow':
+        def subject_likelihood(params):
+            log_sigma = params[0]
+            log_reward = params[1]
+            return get_data_likelihood(log_reward, sub_data, log_sigma, power_law = True)
+
+        bnds = np.array(((-0.7, 2.5), (-6., 1.)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
 
