@@ -9,9 +9,12 @@ import itertools as it
 import seaborn as sns
 from scipy.optimize import brentq
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.animation import FuncAnimation, writers
 from scipy.stats import gaussian_kde, norm
 import pandas as pd
 from pathlib import Path
+import pickle
 from gauss_opt import bayesian_optimisation
 from dynamic_adhoc_twosigma import posterior
 
@@ -24,7 +27,7 @@ T = 10
 t_w = 1
 size = 100
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
-d_map_samples = 2*int(1e4)
+d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
@@ -52,6 +55,7 @@ def d_map(N, epsilons, fine_sigma):
     return -(1 / (2 * fine_sigma**2)) + np.log(1 / N) + \
         np.log(np.sum(np.exp(epsilons / fine_sigma**2)))
 
+
 def sample_epsilon(C, N, fine_sigma):
     epsilons = np.random.normal(0, fine_sigma, N)
     if C == 1:
@@ -59,29 +63,22 @@ def sample_epsilon(C, N, fine_sigma):
     return epsilons
 
 
-def get_coarse_stats(fine_sigma, num_samples, power_law = False):
+def get_coarse_stats(fine_sigma, num_samples):
     '''
     returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats
     row 1 is the mean and row 2 is the sd
-    weight_f specifies the type of weighting given to individual
-    peices of evidence based ona virtual length from focal point
-    NA
     '''
     stats = np.zeros((len(N_array), 2, 2))
     for i in range(len(N_array)):
         N = N_array[i]
-        if power_law == True:
-            sigma = fine_sigma/np.sqrt(N)
-        elif power_law == False:
-            sigma = fine_sigma
         pres_samples = np.zeros(num_samples)
         abs_samples = np.zeros(num_samples)
         for j in range(num_samples):
-            pres_samples[j] = d_map(N, sample_epsilon(1, N, sigma), sigma)
-            abs_samples[j] = d_map(N, sample_epsilon(0, N, sigma), sigma)
+            pres_samples[j] = d_map(N, sample_epsilon(1, N, fine_sigma), fine_sigma)
+            abs_samples[j] = d_map(N, sample_epsilon(0, N, fine_sigma), fine_sigma)
+
         stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
                              [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
-    print(stats)
     return stats
 
 
@@ -182,9 +179,9 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
     decision_vals[:, 1] = g_values * R[1, 1] + \
-        (1 - g_values) * R[1, 0] - (t_w+T) * rho  # respond present
+        (1 - g_values) * R[1, 0] - (t_w + T) * rho  # respond present
     decision_vals[:, 0] = (1 - g_values) * R[0, 0] + \
-        g_values * R[0, 1] - (t_w+T)*rho  # respond absent
+        g_values * R[0, 1] - (t_w + T) * rho  # respond absent
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
@@ -192,12 +189,13 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     V_full[:, -1] = np.max(decision_vals, axis=1)
     # Corresponding array to store the identity of decisions made
     decisions = np.zeros((size, int(T / dt)))
-    decisions[:, -1] = np.argmax(decision_vals, axis=1)+1
+    decisions[:, -1] = np.argmax(decision_vals, axis=1) + 1
 
     # Backwards induction
     for index in range(2, int(T / dt) + 1):
         tau = (index - 1) * dt
         t = T - tau
+        # print(t)
 
         for i in range(size):
             # Sum and subt op cost
@@ -219,14 +217,14 @@ def solve_rho(reward, sigma, mu, prob_grid):
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
         values = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[0]
-        return values[int(size/2), 0]
+        return values[int(size / 2), 0]
 
     # when optimizing for reward this optimization should be accounted for in choosing bounds
     try:
-        opt_log_rho = brentq(V_in_rho, -5+np.log(reward), 5 + np.log(reward))
+        opt_log_rho = brentq(V_in_rho, -5 + np.log(reward), 5 + np.log(reward))
     except ValueError:
         try:
-            opt_log_rho = brentq(V_in_rho, -5+np.log(reward), np.log(reward))
+            opt_log_rho = brentq(V_in_rho, -5 + np.log(reward), np.log(reward))
         except ValueError:
             raise Exception("chosen reward too small")
 
@@ -315,7 +313,7 @@ def get_single_N_likelihood(data, sim_rt, reward):
     return -np.sum(np.log(likelihood_pertrial))
 
 
-def get_data_likelihood(log_reward, sub_data, log_sigma, power_law = False):
+def get_data_likelihood(log_reward, sub_data, log_sigma):
     sigma = np.exp(log_sigma)
     reward = np.exp(log_reward)
     print(sigma)
@@ -323,7 +321,7 @@ def get_data_likelihood(log_reward, sub_data, log_sigma, power_law = False):
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
 
-    stats = get_coarse_stats(sigma, d_map_samples, power_law)
+    stats = get_coarse_stats(sigma, d_map_samples)
     # print(stats)
 
     for i in range(stats.shape[0]):
@@ -334,25 +332,22 @@ def get_data_likelihood(log_reward, sub_data, log_sigma, power_law = False):
         rho = solve_rho(reward, sigma, mu, probs)
         decisions = back_induct(reward, punishment, rho, sigma, mu, probs)[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        likelihood += get_single_N_likelihood(data[i], sim_rt, reward)
+        likelihood += get_single_N_likelihood(data[i], sim_rt, 1)
 
     return likelihood
 
 
 if __name__ == '__main__':
-
-
-    model_type = 'sig_reward_pow'
-    #options are:
-    #sig; fits just a fine grained sigma
-    #sig_reward; fits fine grained sigma and reward per subject
-    #sig_reward_pow; fits fine grained sigma with variable precision for N
+    model_type = 'sig_reward'
+    iter_bayesian_opt = 30
+    '''options are:
+    sig; fits just a fine grained sigma
+    sig_reward; fits fine grained sigma and reward per subject'''
 
     if model_type == 'sig':
         def subject_likelihood(params):
             log_sigma = params[0]
-            log_reward = 0
-            return get_data_likelihood(log_reward, sub_data, log_sigma)
+            return get_data_likelihood(1, sub_data, log_sigma)
 
         bnds = np.array(((-1.7, 1.),))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
@@ -363,61 +358,61 @@ if __name__ == '__main__':
             log_reward = params[1]
             return get_data_likelihood(log_reward, sub_data, log_sigma)
 
-        bnds = np.array(((-1.7, 1.), (-3.,3.)))  # [n_variables, 2] shaped array with bounds
-        x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
+        bnds = np.array(((-1.7, 1.), (-6., 1.)))  # [n_variables, 2] shaped array with bounds
+        x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
-
-    if model_type == 'sig_reward_pow':
-        def subject_likelihood(params):
-            log_sigma = params[0]
-            log_reward = params[1]
-            return get_data_likelihood(log_reward, sub_data, log_sigma, power_law = True)
-
-        bnds = np.array(((-0.7, 3.), (-3.,3.)))  # [n_variables, 2] shaped array with bounds
-        x_opt = bayesian_optimisation(n_iters=15, sample_loss=subject_likelihood,
-                                      bounds=bnds, n_pre_samples=15)
-
 
     xp, yp = x_opt
     # Pull out each of the log(sigma) that the optimizer tested and put them in an array together
     # with the associated log(likelihood). datarr is (N x 2) where N is the number of optimize samps
     datarr = np.array((x_opt[0].reshape(-1), x_opt[1])).T
 
-#dont know how this sort will be effected with 1x2 xp output?
+    # dont know how this sort will be effected with 1x2 xp output?
 
-    #sortdatarr = datarr[np.argsort(datarr[:, 0]), :]
+    # sortdatarr = datarr[np.argsort(datarr[:, 0]), :]
 
     # # Plot test points and likelihoods
-    plt.figure()
-    # plt.scatter(sortdatarr[:, 0], sortdatarr[:, 1])
-    # plt.xlabel(r'$log(\sigma)$')
-    # plt.ylabel(r'log(likelihood)')
-    # plt.title('Subject {} Bayesian Opt tested points'.format(subject_num))
-    #
-    # plt.savefig(savepath + '/subject_{}_bayes_opt_testpoints.png'.format(subject_num))
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(xp[:, 0], xp[:, 1], yp, s=100)
+    ax.set_xlabel('$log(\sigma)$')
+    ax.set_ylabel('$log(reward)$')
+    ax.set_zlabel('$log(likelihood)$')
+
+    def anim_update(i):
+        ax.azim = (i / 540) * 360
+        plt.draw()
+        return
+
+    Writer = writers['ffmpeg']
+    writer = Writer(fps=60, bitrate=1800)
+    anim = FuncAnimation(fig, anim_update, frames=360)
+    anim.save(savepath + '/subject_{}_bayes_opt_testpoints.mp4'.format(subject_num), writer=writer)
+
     # # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
     fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
-    #best_params = datarr[np.argmin(yp), 0]
     best_params = xp[np.argmin(yp)]
     best_sigma = np.exp(best_params[0])
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
 
+    all_rt = {}
     stats = get_coarse_stats(best_sigma, d_map_samples)
     for i in range(stats.shape[0]):
         if model_type == 'sig':
             reward = 1
         elif model_type == 'sig_reward':
             reward = np.exp(best_params[1])
-        print(reward)
+
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
         rootgrid = get_rootgrid(sigma, mu)
-        probs = update_probs(rootgrid, sigma, mu)
-        rho = solve_rho(reward, sigma, mu, probs)
-        decisions = back_induct(reward, punishment, rho, sigma, mu, probs)[1]
+        prob_grid = update_probs(rootgrid, sigma, mu)
+        rho = solve_rho(reward, sigma, mu, prob_grid)
+        decisions = back_induct(reward, punishment, rho, sigma, mu, prob_grid)[1]
         sim_rt = get_rt(sigma, mu, decisions)
+        all_rt[N_array[i]] = sim_rt
 
         currdata = data[i]
         pres_rts_0 = currdata.query('resp == 2 & target == \'Present\'').rt.values
@@ -441,3 +436,9 @@ if __name__ == '__main__':
             ax.set_xlim([0, 6])
 
     plt.savefig(savepath + '/subject_{}_bayes_opt_bestfits.png'.format(subject_num))
+
+    fw = open(savepath + '/subject_{}_simrt_and_params.p', 'wb')
+    outdict = {'best_sigma': best_params[0], 'best_reward': best_params[1], 'sim_rts': all_rt,
+               'coarse_stats': stats}
+    pickle.dump(outdict, fw)
+    fw.close()
