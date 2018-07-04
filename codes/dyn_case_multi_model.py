@@ -306,13 +306,6 @@ def get_single_N_likelihood(data, sim_rt, reward):
                                    np.log(abs_sim_rt_dist.pdf(abs_rts_1))))
 
     log_like_all = np.concatenate((log_like_pres, log_like_abs))
-    # print(sim_rt[0, :])
-    # print(np.mean(sim_rt[0, :]))
-    # print(log_like_abs)
-    #
-    # print(sim_rt[1, :])
-    # print(np.mean(sim_rt[1, :]))
-    # print(log_like_pres)
 
     likelihood_pertrial = (1 - lapse) * np.exp(log_like_all) + (lapse / 2) * np.exp(-reward / temp)
     return -np.sum(np.log(likelihood_pertrial))
@@ -321,7 +314,7 @@ def get_single_N_likelihood(data, sim_rt, reward):
 def get_data_likelihood(log_reward, sub_data, log_sigma, power_law = False):
     sigma = np.exp(log_sigma)
     reward = np.exp(log_reward)
-    print(sigma)
+    print(sigma, reward)
     likelihood = 0
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
