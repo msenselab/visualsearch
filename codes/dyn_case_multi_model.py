@@ -17,6 +17,7 @@ from pathlib import Path
 import pickle
 from gauss_opt import bayesian_optimisation
 from dynamic_adhoc_twosigma import posterior
+from scipy.misc import derivative
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -142,11 +143,11 @@ def get_rootgrid(sigma, mu):
                 rootgrid[i, j, 1] = testx_pos[np.argmin(np.abs(testeval_pos))]
             elif skiproot:
                 if g_t >= g_tp1:
-                    rootgrid[i, j, 0] = -50
-                    rootgrid[i, j, 1] = -50
+                    rootgrid[i, j, 0] = np.NaN
+                    rootgrid[i, j, 1] = np.NaN
                 elif g_t < g_tp1:
-                    rootgrid[i, j, 0] = 50
-                    rootgrid[i, j, 1] = 50
+                    rootgrid[i, j, 0] = np.NaN
+                    rootgrid[i, j, 1] = np.NaN
     return rootgrid
 
 
@@ -157,6 +158,18 @@ def p_new_ev(x, g_t, sigma, mu):
     p_abs = norm.pdf(x, loc=mu[0], scale=sigma[0])
     return p_pres * g_t + p_abs * (1 - g_t)
 
+def jacobian(roots, g_t):
+    '''
+    compute the jacobian scaling factor for root update_probs
+    non-existant roots (NaN) evaluate to inf in the derivative
+    and are set to zero (non-existant root have 0 weight)
+    '''
+    def g(x):
+        return f(x, g_t, sigma, mu)
+    f_prime = derivative(g, roots)
+    jacob = 1/abs(f_prime)
+    jacob[jacob == np.inf] = 0
+    return jacob
 
 def update_probs(rootgrid, sigma, mu):
     prob_grid = np.zeros((size, size))
@@ -166,7 +179,9 @@ def update_probs(rootgrid, sigma, mu):
         roots = rootgrid[i, :, :]
         # Find the likelihood of roots x_(t+1)
         new_g_probs = p_new_ev(roots, g_t, sigma, mu)
-        new_g_probs = new_g_probs / np.sum(new_g_probs)  # Normalize
+        new_g_probs[np.isnan(new_g_probs)] = 0
+        #new_g_probs = new_g_probs  / np.sum(new_g_probs)  # Normalize
+        new_g_probs = new_g_probs*jacobian(roots, g_t)
         new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
         prob_grid[:, i] = new_g_probs
     return prob_grid
@@ -183,9 +198,9 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     # N x 2 matrix. First column is resp. abs, second is pres.
     decision_vals = np.zeros((size, 2))
     decision_vals[:, 1] = g_values * R[1, 1] + \
-        (1 - g_values) * R[1, 0] - (t_w + T) * rho  # respond present
+        (1 - g_values) * R[1, 0] - (t_w * rho)  # respond present
     decision_vals[:, 0] = (1 - g_values) * R[0, 0] + \
-        g_values * R[0, 1] - (t_w + T) * rho  # respond absent
+        g_values * R[0, 1] - (t_w * rho)  # respond absent
 
     # Create array to store V for each g_t at each t. N x (T / dt)
     V_full = np.zeros((size, int(T / dt)))
@@ -203,7 +218,7 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
 
         for i in range(size):
             # Sum and subt op cost
-            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) - rho * t
+            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) - rho * dt
             # Find the maximum value b/w waiting and two decision options. Store value and identity.
             V_full[i, -index] = np.amax((V_wait,
                                          decision_vals[i, 0], decision_vals[i, 1]))
