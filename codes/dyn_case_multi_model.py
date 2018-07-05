@@ -16,9 +16,8 @@ from pathlib import Path
 import pickle
 from gauss_opt import bayesian_optimisation
 from dynamic_adhoc_twosigma import posterior
-import autograd.numpy as np  # Thinly-wrapped numpy
-from autograd import grad    # The only autograd function you may ever need
 from scipy.misc import derivative
+import numpy as np
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -65,7 +64,7 @@ def sample_epsilon(C, N, fine_sigma):
     return epsilons
 
 
-def get_coarse_stats(fine_sigma, num_samples, power_law = False):
+def get_coarse_stats(fine_sigma, num_samples, power_law=False):
     '''
     returns a 2x2 matrix, col 1 is abs stats, col 2 pres stats
     row 1 is the mean and row 2 is the sd
@@ -73,9 +72,9 @@ def get_coarse_stats(fine_sigma, num_samples, power_law = False):
     stats = np.zeros((len(N_array), 2, 2))
     for i in range(len(N_array)):
         N = N_array[i]
-        if power_law == False:
+        if not power_law:
             sigma = fine_sigma
-        if power_law == True:
+        if power_law:
             sigma = np.sqrt(N)/fine_sigma
         pres_samples = np.zeros(num_samples)
         abs_samples = np.zeros(num_samples)
@@ -97,6 +96,7 @@ def f(x, g_t, sigma, mu):
     abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
 
     post = (g_t * pres_draw) / (g_t * pres_draw + (1 - g_t) * abs_draw)
+    #TO DO: put all in exponent
 
     if sigma[0] < sigma[1] and isinstance(x, np.ndarray):
         post[np.invert(np.isfinite(post))] = 1.
@@ -105,6 +105,26 @@ def f(x, g_t, sigma, mu):
 
     return post
 
+def f_prime(x, g_t, sigma, mu):
+    pres_eval = g_t * norm.pdf(x, loc=mu[1], scale=sigma[1])
+    abs_eval = (1- g_t) * norm.pdf(x, loc=mu[0], scale=sigma[0])
+    a = (x - mu[1])/sigma[1]**2
+    b = (x - mu[0])/sigma[0]**2
+
+    gradient = -((a*pres_eval * (pres_eval + abs_eval) - \
+        pres_eval*(a*pres_eval + b*abs_eval))/(pres_eval + abs_eval)**2)
+
+    return gradient
+
+def jacobian(roots, g_t, sigma, mu):
+    '''
+    compute the jacobian scaling factor for root update_probs
+    non-existant roots (NaN) evaluate to inf in the derivative
+    and are set to zero (non-existant root have 0 weight)
+    '''
+    jacob = 1/abs(f_prime(roots, g_t, sigma, mu))
+    jacob[np.isnan(jacob)] = 0
+    return jacob
 
 def get_rootgrid(sigma, mu):
     testx = np.linspace(-50, 50, 1000)
@@ -143,10 +163,6 @@ def get_rootgrid(sigma, mu):
                 rootgrid[i, j, 0] = testx_neg[np.argmin(np.abs(testeval_neg))]
                 rootgrid[i, j, 1] = testx_pos[np.argmin(np.abs(testeval_pos))]
             elif skiproot:
-                if g_t >= g_tp1:
-                    rootgrid[i, j, 0] = np.NaN
-                    rootgrid[i, j, 1] = np.NaN
-                elif g_t < g_tp1:
                     rootgrid[i, j, 0] = np.NaN
                     rootgrid[i, j, 1] = np.NaN
     return rootgrid
@@ -158,48 +174,27 @@ def p_new_ev(x, g_t, sigma, mu):
     p_abs = norm.pdf(x, loc=mu[0], scale=sigma[0])
     return p_pres * g_t + p_abs * (1 - g_t)
 
-def jacobian(roots, g_t, sigma, mu):
-    '''
-    compute the jacobian scaling factor for root update_probs
-    non-existant roots (NaN) evaluate to inf in the derivative
-    and are set to zero (non-existant root have 0 weight)
-    '''
-    def g(x):
-        return f(x, g_t, sigma, mu)
-    roots = np.array(roots, dtype=np.float64)
-    jacob = 1/abs(derivative(g, roots, dx=1e-6))
-    jacob[jacob == np.inf] = 0
-    return jacob
-
-# def f_prime(x, g_t, sigma, mu):
-#     pres_eval = g_t * norm.pdf(x, loc=mu[1], scale=sigma[1])
-#     abs_eval = (1- g_t) * norm.pdf(x, loc=mu[0], scale=sigma[0])
-#     a = (x - mu[1])/sigma[1]**2
-#     b = (x - mu[0])/sigma[0]**2
-#
-#     grad = (a*pres_eval * (pres_eval + abs_eval) - \
-#         pres_eval*(a*pres_eval + b*abs_eval))/(pres_eval + abs_eval)**2
-#
-#     return grad
-
-
 def update_probs(rootgrid, sigma, mu):
     prob_grid = np.zeros((size, size))
+    dg = g_values[1] - g_values[0]
+
     for i in range(size):
         g_t = g_values[i]  # Pick ith value of g at t
         # Slice roots of our given g_t across all g_(t+1)
         roots = rootgrid[i, :, :]
         # Find the likelihood of roots x_(t+1)
-        new_g_probs = p_new_ev(roots, g_t, sigma, mu)
+        new_g_probs =   (roots, g_t, sigma, mu)
         new_g_probs[np.isnan(new_g_probs)] = 0
-        new_g_probs = new_g_probs  / np.sum(new_g_probs)  # Normalize
-        new_g_probs = new_g_probs*jacobian(roots, g_t)
+        new_g_probs = new_g_probs*jacobian(roots, g_t, sigma, mu)
         new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
+        new_g_probs = new_g_probs  / ( np.sum(new_g_probs) * dg )  # Normalize
+
         prob_grid[:, i] = new_g_probs
     return prob_grid
 
 
 def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
+    dg = g_values[1] - g_values[0]
 
     # Define the reward array
     R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
@@ -230,14 +225,14 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
 
         for i in range(size):
             # Sum and subt op cost
-            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) - rho * dt
+            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)] * dg) - rho * dt
             V_pause[i, -index] = V_wait
             # Find the maximum value b/w waiting and two decision options. Store value and identity.
             V_full[i, -index] = np.amax((V_wait,
                                          decision_vals[i, 0], decision_vals[i, 1]))
             decisions[i, -index] = np.argmax((V_wait,
                                               decision_vals[i, 0], decision_vals[i, 1]))
-    return V_full, decisions
+    return V_full, decisions, V_pause
 
 
 def solve_rho(reward, sigma, mu, prob_grid):
