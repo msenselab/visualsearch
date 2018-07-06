@@ -16,7 +16,6 @@ from pathlib import Path
 import pickle
 from gauss_opt import bayesian_optimisation
 from dynamic_adhoc_twosigma import posterior
-from scipy.misc import derivative
 import numpy as np
 
 # Returns a path object that works as a string for most functions
@@ -25,7 +24,7 @@ savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 
 T = 10
-t_w = 1
+t_w = 0.5
 size = 100
 g_values = np.linspace(1e-3, 1 - 1e-3, size)
 d_map_samples = int(1e4)
@@ -92,10 +91,10 @@ def f(x, g_t, sigma, mu):
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
     the appropriate g_(t+1) as an output for a single value of x_(t+1)
     '''
-    pres_draw = norm.pdf(x, loc=mu[1], scale=sigma[1])
-    abs_draw = norm.pdf(x, loc=mu[0], scale=sigma[0])
+    p_pres = norm.pdf(x, loc=mu[1], scale=sigma[1])
+    p_abs = norm.pdf(x, loc=mu[0], scale=sigma[0])
 
-    post = (g_t * pres_draw) / (g_t * pres_draw + (1 - g_t) * abs_draw)
+    post = (g_t * p_pres) / (g_t * p_pres + (1 - g_t) * p_abs)
     #TO DO: put all in exponent
 
     if sigma[0] < sigma[1] and isinstance(x, np.ndarray):
@@ -126,14 +125,33 @@ def jacobian(roots, g_t, sigma, mu):
     jacob[np.isnan(jacob)] = 0
     return jacob
 
-def get_rootgrid(sigma, mu):
-    testx = np.linspace(-50, 50, 1000)
+def contraction_find(f, eval_res, layers, init_min, init_max):
+    '''
+    find the zero of a function on the interval init_min to init_max,
+    f must be monotonic on this given interval
+    '''
+    testspace = np.linspace(init_min, init_max, num = eval_res)
+    for i in range(layers):
+        f_space = f(testspace)
+        asign = np.sign(f_space)
+        signchange = ((np.roll(asign, 1) - asign) != 0).astype(int)
+        if signchange[1:0] == np.zeros_like(signchange[1:0]):
+             raise Exception('f has no zero on given interval (init_min, init_max)')
+        new_end = testspace[np.argmax(signchange[1:])+1]
+        new_begin = testspace[np.argmax(signchange[1:])]
+        root = new_end - (new_end - new_begin)/2
+        testspace = np.linspace(new_begin, new_end, num = eval_res)
+    return root
+
+def get_rootgrid(sigma, mu, k):
+    testx = np.linspace(-50, 50, 10000)
     testeval = f(testx, 0.5, sigma, mu)
     if sigma[1] < sigma[0]:
         ourpeak = testx[np.argmax(testeval)]
     elif sigma[0] < sigma[1]:
         ourpeak = testx[np.argmin(testeval)]
-    rootgrid = np.zeros((size, size, 2))  # NxN grid of values for g_t, g_tp1
+    rootgrid = np.zeros((size, size*k, 2))  # NxN grid of values for g_t, g_tp1
+    g_tp1_values = np.linspace(1e-3, 1 - 1e-3, size*k)
 
     for i in range(size):
         g_t = g_values[i]
@@ -142,8 +160,8 @@ def get_rootgrid(sigma, mu):
             peak = np.amax(testeval_gt)
         elif sigma[0] < sigma[1]:
             peak = np.amin(testeval_gt)
-        for j in range(size):
-            g_tp1 = g_values[j]
+        for j in range(size*k):
+            g_tp1 = g_tp1_values[j]
             if sigma[1] < sigma[0] and g_tp1 > peak:
                 skiproot = True
             elif sigma[0] < sigma[1] and g_tp1 < peak:
@@ -156,12 +174,8 @@ def get_rootgrid(sigma, mu):
                     if type(x) == float:
                         x = np.array([x])
                     return g_tp1 - f(x, g_t, sigma, mu)
-                testx_neg = np.linspace(-50, ourpeak, 1000)
-                testx_pos = np.linspace(ourpeak, 50, 1000)
-                testeval_neg = rootfunc(testx_neg)
-                testeval_pos = rootfunc(testx_pos)
-                rootgrid[i, j, 0] = testx_neg[np.argmin(np.abs(testeval_neg))]
-                rootgrid[i, j, 1] = testx_pos[np.argmin(np.abs(testeval_pos))]
+                rootgrid[i, j, 0] = contraction_find(rootfunc, 30, 3, -20, ourpeak)
+                rootgrid[i, j, 1] = contraction_find(rootfunc, 30, 3, ourpeak, 20)
             elif skiproot:
                     rootgrid[i, j, 0] = np.NaN
                     rootgrid[i, j, 1] = np.NaN
@@ -176,28 +190,29 @@ def p_new_ev(x, g_t, sigma, mu):
 
 def update_probs(rootgrid, sigma, mu):
     prob_grid = np.zeros((size, size))
-    dg = g_values[1] - g_values[0]
+    k = int(rootgrid.shape[1]/rootgrid.shape[0])
 
+    dg = (g_values[1] - g_values[0])/k
     for i in range(size):
         g_t = g_values[i]  # Pick ith value of g at t
         # Slice roots of our given g_t across all g_(t+1)
         roots = rootgrid[i, :, :]
         # Find the likelihood of roots x_(t+1)
-        new_g_probs =   (roots, g_t, sigma, mu)
+        new_g_probs = p_new_ev(roots, g_t, sigma, mu)
         new_g_probs[np.isnan(new_g_probs)] = 0
         new_g_probs = new_g_probs*jacobian(roots, g_t, sigma, mu)
         new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
         new_g_probs = new_g_probs  / ( np.sum(new_g_probs) * dg )  # Normalize
-
-        prob_grid[:, i] = new_g_probs
+        prob_slice = np.sum(np.reshape(new_g_probs, (size, k)), axis = 1)/k
+        prob_grid[:, i] = prob_slice
     return prob_grid
 
 
-def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
+def back_induct(reward, punishment, rho, sigma, mu, prob_grid, t_dependent = False):
     dg = g_values[1] - g_values[0]
 
     # Define the reward array
-    R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)
+    R = np.array([(reward, punishment),   # (abs/abs,   abs/pres)V
                   (punishment, reward)])  # (pres/abs, pres/pres) in form decision / actual
 
     # Decision values are static for a given g_t and independent of t. We compute these
@@ -216,23 +231,30 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid):
     # Corresponding array to store the identity of decisions made
     decisions = np.zeros((size, int(T / dt)))
     decisions[:, -1] = np.argmax(decision_vals, axis=1) + 1
-    V_pause = np.zeros_like(V_full)
+
     # Backwards induction
     for index in range(2, int(T / dt) + 1):
-        tau = (index - 1) * dt
-        t = T - tau
-        # print(t)
-
         for i in range(size):
-            # Sum and subt op cost
-            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)] * dg) - rho * dt
-            V_pause[i, -index] = V_wait
-            # Find the maximum value b/w waiting and two decision options. Store value and identity.
-            V_full[i, -index] = np.amax((V_wait,
-                                         decision_vals[i, 0], decision_vals[i, 1]))
-            decisions[i, -index] = np.argmax((V_wait,
-                                              decision_vals[i, 0], decision_vals[i, 1]))
-    return V_full, decisions, V_pause
+            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * dt)
+            #Find the maximum value b/w waiting and two decision options. Store value and identity.
+            V_full[i, -index] = np.amax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
+            decisions[i, -index] = np.argmax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
+
+        if not t_dependent and index > 20:
+            abs_err = np.abs(V_full[:, -index] - V_full[:, -(index-1)])
+            converged = np.all(abs_err < 1e-8)
+            if converged:
+                dec_vec = decisions[:, -index]
+                abs_threshold = np.argmax(np.where(dec_vec == 1)[0])
+                pres_threshold = np.where(dec_vec == 2)[0][0]
+                dec_vec[0:abs_threshold] = 1
+                dec_vec[pres_threshold:len(dec_vec)] = 2
+                V_full = np.reshape(np.repeat(V_full[:, -index], V_full.shape[1]), (size, V_full.shape[1]))
+                decisions = np.reshape(np.repeat(dec_vec, decisions.shape[1]), (size, decisions.shape[1]))
+                print(index)
+                break
+
+    return V_full, decisions
 
 
 def solve_rho(reward, sigma, mu, prob_grid):
