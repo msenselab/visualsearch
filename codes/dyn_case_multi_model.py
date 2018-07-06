@@ -31,6 +31,7 @@ d_map_samples = int(1e4)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 0.001
+punishment = 0
 
 try:
     subject_num = sys.argv[1]
@@ -42,7 +43,6 @@ except ValueError:
     print('No subject number passed at prompt. Setting subject to 1')
 
 print('Subject number {}'.format(subject_num))
-punishment = -.1
 
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
@@ -251,7 +251,6 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid, t_dependent = Fal
                 dec_vec[pres_threshold:len(dec_vec)] = 2
                 V_full = np.reshape(np.repeat(V_full[:, -index], V_full.shape[1]), (size, V_full.shape[1]))
                 decisions = np.reshape(np.repeat(dec_vec, decisions.shape[1]), (size, decisions.shape[1]))
-                print(index)
                 break
 
     return V_full, decisions
