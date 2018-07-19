@@ -96,6 +96,7 @@ def get_coarse_stats(fine_sigma, num_samples, model_type):
 
         stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
                              [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
+
     return stats
 
 def discrimination_check(stats):
@@ -272,6 +273,34 @@ def update_probs(rootgrid, sigma, mu, resolution = 'low'):
         return prob_grid
 
 
+def g_to_D(g_t):
+    return np.log(g_t/(1-g_t))
+
+def D_to_g(D_t):
+    return np.exp(D_t)/(1+np.exp(D_t))
+
+def deriv_dg_dD(D_t):
+    return D_to_g(D_t)*(1-D_to_g(D_t))
+
+def p_gtp1_gt(g_t, g_tp1, sigma, mu):
+    D_t = g_to_D(g_t)
+    D_tp1 = g_to_D(g_tp1)
+    jacobian_factor = 1/deriv_dg_dD(D_t)
+
+    pres_draw = g_t*norm.pdf(D_tp1, D_t+mu[1], sigma[1])
+    abs_draw = (1-g_t)*norm.pdf(D_tp1, D_t-mu[0], sigma[0])
+
+    return jacobian_factor*(pres_draw+abs_draw)
+
+def trans_probs(sigma, mu):
+    prob_grid = np.zeros((size, size))
+    for i, g_t in enumerate(g_values):
+        updates = p_gtp1_gt(g_t, g_values, sigma, mu)
+        prob_grid[i, :] = updates
+
+    return prob_grid
+
+
 def back_induct(reward, punishment, rho, sigma, mu, prob_grid, reward_scheme,
     t_dependent = False):
     dg = g_values[1] - g_values[0]
@@ -357,50 +386,63 @@ def simulate_observer(arglist):
     C, decisions, sigma, mu, dt = arglist
     step = 0
     t = 0
-    g_t = np.ones(int(T / dt)) * 0.5
-    grid_traj = np.zeros_like(g_t)
+    g_trajectory = np.ones(int(T / dt)) * 0.5
     while t < (T - dt):
         step += 1
         t = step * dt
-        x_t = norm.rvs(mu[C], sigma[C]) * dt
-        g_t[step] = posterior(x_t, g_t[step - 1], C, sigma, mu)
-        nearest_grid = np.abs(g_values - g_t[step]).argmin()
-        grid_traj[step] = nearest_grid
+
+        g_t = g_trajectory[step-1]
+        D_t = g_to_D(g_t)
+
+        # momentary evidence
+        if C == 1:
+            new_D_t = norm.rvs(D_t + mu[C], sigma[C]) * dt
+        if C == 0:
+            new_D_t = norm.rvs(D_t-mu[C], sigma[C]) * dt
+        g_trajectory[step] = D_to_g(new_D_t)
+        nearest_grid = np.abs(g_values - g_trajectory[step]).argmin()
+
         decision_t = decisions[nearest_grid, step]
         if decision_t != 0:
             break
     return (decision_t, t, g_t)
 
-# def alt_sim(prob_grid, decisions):
-#     ##COMPUTEs prob distribution and not density
-#     dg = (g_values[1] - g_values[0])
-#
-#     g_t = np.zeros(prob_grid.shape[0])
-#     g_t[int(len(g_t)/2)] = 1
-#
-#     dec_vec = decisions[:,0]
-#     abs_threshold = np.amax(np.where(dec_vec == 1)[0])
-#     pres_threshold = np.where(dec_vec == 2)[0][0]
-#
-#     resp_dist = np.zeros((2, int(T/dt)))
-#     dist_evo = np.zeros((prob_grid.shape[0], int(T/dt)))
-#     t = 0
-#
-#     while t < (T-dt):
-#         dist_evo[:, int(t/dt)] = g_t
-#         print(g_t[0])
-#         abs_cum_density = np.sum(g_t[:abs_threshold])
-#         pres_cum_density = np.sum(g_t[pres_threshold:])
-#
-#         resp_dist[0, int(t/dt)] = abs_cum_density
-#         resp_dist[1, int(t/dt)] = pres_cum_density
-#
-#         g_t = np.matmul(g_t, prob_grid)
-#         g_t = g_t/(np.sum(g_t))
-#
-#         t += dt
-#
-#     return dist_evo, resp_dist
+def alt_sim(prob_grid, decisions):
+    ##COMPUTEs prob distribution and not density
+    dg = (g_values[1] - g_values[0])
+
+    g_t = np.zeros(prob_grid.shape[0])
+    g_t[int(len(g_t)/2)] = 1
+
+    dec_vec = decisions[:,0]
+    abs_threshold = np.amax(np.where(dec_vec == 1)[0])
+    pres_threshold = np.where(dec_vec == 2)[0][0]
+
+    resp_dist = np.zeros((2, int(T/dt)))
+    dist_evo = np.zeros((prob_grid.shape[0], int(T/dt)))
+    t = 0
+
+    while t < (T-dt):
+        dist_evo[:, int(t/dt)] = g_t
+        abs_cum_density = np.sum(g_t[:abs_threshold])
+        pres_cum_density = np.sum(g_t[pres_threshold:])
+
+        resp_dist[0, int(t/dt)] = abs_cum_density
+        resp_dist[1, int(t/dt)] = pres_cum_density
+
+        remaining_density = np.sum(g_t) - (abs_cum_density + pres_cum_density)
+
+        g_t = np.matmul(prob_grid[:,abs_threshold:pres_threshold], g_t[abs_threshold:pres_threshold])
+        g_t = g_t/(np.sum(g_t))
+
+        t += dt
+
+    plt.figure()
+    plt.imshow(dist_evo)
+    plt.axhline(y = abs_threshold)
+    plt.axhline(y = pres_threshold)
+
+    return dist_evo, resp_dist
 
 
 def get_rt(sigma, mu, decisions):
