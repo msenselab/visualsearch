@@ -293,9 +293,12 @@ def p_gtp1_gt(g_t, g_tp1, sigma, mu):
     return jacobian_factor*(pres_draw+abs_draw)
 
 def trans_probs(sigma, mu):
+    dg = g_values[1] - g_values[0]
+
     prob_grid = np.zeros((size, size))
     for i, g_t in enumerate(g_values):
         updates = p_gtp1_gt(g_t, g_values, sigma, mu)
+        updates = updates / (np.sum(updates) * dg)
         prob_grid[i, :] = updates
 
     return prob_grid
@@ -384,28 +387,48 @@ def solve_rho(reward, punishment, reward_scheme, sigma, mu, prob_grid):
 
 def simulate_observer(arglist):
     C, decisions, sigma, mu, dt = arglist
-    step = 0
+
+    dec_vec = decisions[:,0]
+    abs_bound = g_values[np.amax(np.where(dec_vec == 1)[0])]
+    pres_bound = g_values[np.where(dec_vec == 2)[0][0]]
+
+    D_t = 0
     t = 0
-    g_trajectory = np.ones(int(T / dt)) * 0.5
-    while t < (T - dt):
-        step += 1
-        t = step * dt
 
-        g_t = g_trajectory[step-1]
-        D_t = g_to_D(g_t)
-
-        # momentary evidence
+    while t < T:
         if C == 1:
-            new_D_t = norm.rvs(D_t + mu[C], sigma[C]) * dt
+            D_t = norm.rvs(D_t + mu[C], sigma[C])
         if C == 0:
-            new_D_t = norm.rvs(D_t-mu[C], sigma[C]) * dt
-        g_trajectory[step] = D_to_g(new_D_t)
-        nearest_grid = np.abs(g_values - g_trajectory[step]).argmin()
+            D_t = norm.rvs(D_t-mu[C], sigma[C])
 
-        decision_t = decisions[nearest_grid, step]
-        if decision_t != 0:
-            break
-    return (decision_t, t, g_t)
+        nearest_gt = g_values[np.abs(g_values - D_to_g(D_t)).argmin()]
+
+        if nearest_gt < abs_bound:
+            return (1, t)
+        if nearest_gt > pres_bound:
+            return (2, t)
+
+        t += dt
+    return (0, T)
+
+
+
+# def simulate_observer(arglist):
+#     C, decisions, sigma, mu, dt = arglist
+#     step = 0
+#     t = 0
+#     g_t = np.ones(int(T / dt)) * 0.5
+#     while t < (T - dt):
+#         step += 1
+#         t = step * dt
+#         x_t = np.random.normal(mu[C], sigma[C]) * dt
+#         g_t[step] = posterior(x_t, g_t[step - 1], C, sigma, mu)
+#         nearest_grid = np.abs(g_values - g_t[step]).argmin()
+#         decision_t = decisions[nearest_grid, step]
+#         if decision_t != 0:
+#             break
+#     return (decision_t, t, g_t)
+
 
 def alt_sim(prob_grid, decisions):
     ##COMPUTEs prob distribution and not density
@@ -446,7 +469,7 @@ def alt_sim(prob_grid, decisions):
 
 
 def get_rt(sigma, mu, decisions):
-    numsims = 2000
+    numsims = 10000
     C_vals = [0] * numsims
     C_vals.extend([1] * numsims)
     arglists = it.product(C_vals, [decisions], [sigma], [mu], [dt])
