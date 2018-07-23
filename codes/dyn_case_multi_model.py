@@ -50,7 +50,6 @@ exp1.rename(columns={'sub': 'subno'}, inplace=True)
 temp = np.mean(np.array(exp1['rt']))
 sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
 
-
 def d_map(N, epsilons, sigma_N):
     '''
     Computes the decisions variable d based on the log likelihood ratio
@@ -59,7 +58,6 @@ def d_map(N, epsilons, sigma_N):
     '''
     return -(1 / (2 * sigma_N**2)) + np.log(1 / N) + \
         np.log(np.sum(np.exp(epsilons / sigma_N**2)))
-
 
 def sample_epsilon(C, N, sigma):
     '''
@@ -70,7 +68,6 @@ def sample_epsilon(C, N, sigma):
     if C == 1:
         epsilons[0] = norm.rvs(1, sigma)
     return epsilons
-
 
 def get_coarse_stats(fine_sigma, num_samples, model_type):
     '''
@@ -112,7 +109,6 @@ def discrimination_check(stats):
         d_prime[i] = delta_mu/denom
     return d_prime
 
-
 def f(x, g_t, sigma, mu):
     ''' x_(t + 1) is x
     Formally P(g_(t+1) | x_(t+1), g_t), for a given g_t and g_(t+1) this will only produce
@@ -138,7 +134,6 @@ def f(x, g_t, sigma, mu):
         post[np.invert(np.isfinite(post))] = 0.
 
     return post
-
 
 def contraction_find(f, eval_res, layers, init_min, init_max):
     '''
@@ -288,18 +283,36 @@ def p_gtp1_gt(g_t, g_tp1, sigma, mu):
     jacobian_factor = 1/deriv_dg_dD(D_t)
 
     pres_draw = g_t*norm.pdf(D_tp1, D_t+mu[1], sigma[1])
-    abs_draw = (1-g_t)*norm.pdf(D_tp1, D_t-mu[0], sigma[0])
+    abs_draw = (1-g_t)*norm.pdf(D_tp1, D_t+mu[0], sigma[0])
 
     return jacobian_factor*(pres_draw+abs_draw)
 
-def trans_probs(sigma, mu):
-    dg = g_values[1] - g_values[0]
+def p_Dtp1_Dt(D_t, D_tp1, sigma, mu):
+    g_t = D_to_g(D_t)
 
-    prob_grid = np.zeros((size, size))
-    for i, g_t in enumerate(g_values):
-        updates = p_gtp1_gt(g_t, g_values, sigma, mu)
-        updates = updates / (np.sum(updates) * dg)
-        prob_grid[i, :] = updates
+    pres_draw = g_t*norm.pdf(D_tp1, D_t+mu[1], sigma[1])
+    abs_draw = (1-g_t)*norm.pdf(D_tp1, D_t+mu[0], sigma[0])
+
+    return pres_draw+abs_draw
+
+
+def trans_probs(sigma, mu, space = 'g'):
+    if space == 'g':
+        dg = g_values[1] - g_values[0]
+        prob_grid = np.zeros((size, size))
+        for i, g_t in enumerate(g_values):
+            updates = p_gtp1_gt(g_t, g_values, sigma, mu)
+            updates = updates / (np.sum(updates) * dg)
+            prob_grid[i, :] = updates
+
+    if space == 'D':
+        D_values = np.linspace(0, 1e2, 1e3)
+        dD = D_values[1] - D_values[0]
+        prob_grid = np.zeros((len(D_values),len(D_values)))
+        for i, D_t in enumerate(D_values):
+            updates = p_Dtp1_Dt(D_t, D_values, sigma, mu)
+            updates = updates / (np.sum(updates) * dD)
+            prob_grid[i, :] = updates
 
     return prob_grid
 
@@ -346,7 +359,7 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid, reward_scheme,
             decisions[i, -index] = np.argmax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
         if not t_dependent and index > 20:
             absolute_err = np.abs(V_full[:, -index] - V_full[:, -(index-1)])
-            converged = np.all(absolute_err[5:-5] < 1e-3)
+            converged = np.all(absolute_err[5:-5] < 1e-5)
             if converged:
                 dec_vec = decisions[:, -index]
                 #deal with degenerate cases in which there are no 1, 2s
@@ -395,21 +408,24 @@ def simulate_observer(arglist):
     D_t = 0
     t = 0
 
+    g_trajectory = np.ones(int(T/dt))*0.5
+
     while t < T:
         if C == 1:
-            D_t = norm.rvs(D_t + mu[C], sigma[C])
+            D_t = norm.rvs(D_t + mu[C], sigma[C]) * dt
         if C == 0:
-            D_t = norm.rvs(D_t-mu[C], sigma[C])
+            D_t = norm.rvs(D_t + mu[C], sigma[C]) * dt
+        g_t = D_to_g(D_t)
 
-        nearest_gt = g_values[np.abs(g_values - D_to_g(D_t)).argmin()]
-
-        if nearest_gt < abs_bound:
-            return (1, t)
-        if nearest_gt > pres_bound:
-            return (2, t)
-
+        g_trajectory[int(t/dt)] = g_t
         t += dt
-    return (0, T)
+
+        if g_t < abs_bound:
+            return (1, t, g_trajectory)
+        if g_t > pres_bound:
+            return (2, t, g_trajectory)
+
+    return (0, T, g_trajectory)
 
 
 
@@ -444,7 +460,7 @@ def alt_sim(prob_grid, decisions):
     resp_dist = np.zeros((2, int(T/dt)))
     dist_evo = np.zeros((prob_grid.shape[0], int(T/dt)))
     t = 0
-
+    remaining_density = 1
     while t < (T-dt):
         dist_evo[:, int(t/dt)] = g_t
         abs_cum_density = np.sum(g_t[:abs_threshold])
@@ -453,23 +469,29 @@ def alt_sim(prob_grid, decisions):
         resp_dist[0, int(t/dt)] = abs_cum_density
         resp_dist[1, int(t/dt)] = pres_cum_density
 
-        remaining_density = np.sum(g_t) - (abs_cum_density + pres_cum_density)
+        remaining_density = remaining_density - (abs_cum_density + pres_cum_density)
+
+        print(remaining_density)
+
+        g_t = g_t/remaining_density
 
         g_t = np.matmul(prob_grid[:,abs_threshold:pres_threshold], g_t[abs_threshold:pres_threshold])
-        g_t = g_t/(np.sum(g_t))
 
         t += dt
 
     plt.figure()
-    plt.imshow(dist_evo)
+    plt.imshow(dist_evo[:, 5:])
     plt.axhline(y = abs_threshold)
     plt.axhline(y = pres_threshold)
 
-    return dist_evo, resp_dist
+    resp_abs = resp_dist[0,:]/np.sum(resp_dist[0,:])
+    resp_pres = resp_dist[1,:]/np.sum(resp_dist[1,:])
+
+    return resp_abs, resp_pres, dist_evo
 
 
 def get_rt(sigma, mu, decisions):
-    numsims = 10000
+    numsims = 2000
     C_vals = [0] * numsims
     C_vals.extend([1] * numsims)
     arglists = it.product(C_vals, [decisions], [sigma], [mu], [dt])
@@ -477,6 +499,9 @@ def get_rt(sigma, mu, decisions):
     for arglist in arglists:
         observer_outputs.append(simulate_observer(arglist))
     response_times = np.array([x[1] for x in observer_outputs])
+    plt.figure()
+    plt.imshow(decisions)
+    [plt.plot(x[2]*100) for x in observer_outputs]
     return response_times.reshape(2, numsims)
 
 
@@ -538,8 +563,9 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
     for i in range(stats.shape[0]):
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
-        rootgrid = get_rootgrid(sigma, mu, k)
-        probs = update_probs(rootgrid, sigma, mu)
+        # rootgrid = get_rootgrid(sigma, mu, k)
+        # probs = update_probs(rootgrid, sigma, mu)
+        probs = trans_probs(sigma, mu)
         rho = solve_rho(reward, punishment, reward_scheme, sigma, mu, probs)
         decisions = back_induct(reward, punishment, rho, sigma, mu,
                                                 probs, reward_scheme)[1]
@@ -549,7 +575,7 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
     return likelihood
 
 if __name__ == '__main__':
-    model_type = ('sig_reward', 'asym_reward', 'sqrt')
+    model_type = ('sig_punish', 'epsilon_punish', 'const')
     iter_bayesian_opt = 15
     '''model type is formated as tuple with first argument denoting parameters to fits;
         options are:
@@ -672,8 +698,9 @@ if __name__ == '__main__':
     for i in range(stats.shape[0]):
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
-        rootgrid = get_rootgrid(sigma, mu, k)
-        prob_grid = update_probs(rootgrid, sigma, mu)
+        # rootgrid = get_rootgrid(sigma, mu, k)
+        # prob_grid = update_probs(rootgrid, sigma, mu)
+        prob_grid = trans_probs(sigma, mu)
         rho = solve_rho(reward, punishment, model_type[1], sigma, mu, prob_grid)
         decisions = back_induct(reward, punishment, rho, sigma, mu, prob_grid, model_type[1])[1]
         sim_rt = get_rt(sigma, mu, decisions)
