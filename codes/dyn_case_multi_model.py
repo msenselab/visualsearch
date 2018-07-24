@@ -423,14 +423,11 @@ def simulate_observer(arglist):
         t += dt
 
         if g_t < abs_bound:
-#            plt.plot(g_trajectory*100)
             return (1, t, g_trajectory, D_trajectory)
 
         if g_t > pres_bound:
-#            plt.plot(g_trajectory*100)
             return (2, t, g_trajectory, D_trajectory)
 
-#    plt.plot(g_trajectory*100)
     return (0, T, g_trajectory, D_trajectory)
 
 
