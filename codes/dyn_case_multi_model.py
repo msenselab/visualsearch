@@ -15,7 +15,6 @@ import pandas as pd
 from pathlib import Path
 import pickle
 from gauss_opt import bayesian_optimisation
-from dynamic_adhoc_twosigma import posterior
 import numpy as np
 
 # Returns a path object that works as a string for most functions
@@ -26,7 +25,7 @@ savepath = str(savepath.expanduser())
 T = 10
 t_w = 0.5
 size = 100
-g_values = np.linspace(1/size, 1 - 1/size, size)
+g_values = np.linspace(1 / size, 1 - 1 / size, size)
 d_map_samples = int(1e5)
 dt = 0.05
 N_array = [8, 12, 16]
@@ -50,6 +49,7 @@ exp1.rename(columns={'sub': 'subno'}, inplace=True)
 temp = np.mean(np.array(exp1['rt']))
 sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
 
+
 def d_map(N, epsilons, sigma_N):
     '''
     Computes the decisions variable d based on the log likelihood ratio
@@ -58,6 +58,7 @@ def d_map(N, epsilons, sigma_N):
     '''
     return -(1 / (2 * sigma_N**2)) + np.log(1 / N) + \
         np.log(np.sum(np.exp(epsilons / sigma_N**2)))
+
 
 def sample_epsilon(C, N, sigma):
     '''
@@ -68,6 +69,7 @@ def sample_epsilon(C, N, sigma):
     if C == 1:
         epsilons[0] = norm.rvs(1, sigma)
     return epsilons
+
 
 def get_coarse_stats(fine_sigma, num_samples, model_type):
     '''
@@ -84,7 +86,7 @@ def get_coarse_stats(fine_sigma, num_samples, model_type):
         if model_type == 'const':
             sigma_N = fine_sigma
         if model_type == 'sqrt':
-            sigma_N = fine_sigma * (np.sqrt(N)/np.sqrt(N_min))
+            sigma_N = fine_sigma * (np.sqrt(N) / np.sqrt(N_min))
         pres_samples = np.zeros(num_samples)
         abs_samples = np.zeros(num_samples)
         for j in range(num_samples):
@@ -96,6 +98,7 @@ def get_coarse_stats(fine_sigma, num_samples, model_type):
 
     return stats
 
+
 def discrimination_check(stats):
     '''
     Computes the discriminability of pres/abs distributions
@@ -106,8 +109,9 @@ def discrimination_check(stats):
         stats_N = stats[i]
         delta_mu = stats_N[1, 0] - stats_N[0, 0]
         denom = np.sqrt(0.5 * (stats_N[0, 1] + stats_N[1, 1]))
-        d_prime[i] = delta_mu/denom
+        d_prime[i] = delta_mu / denom
     return d_prime
+
 
 def f(x, g_t, sigma, mu):
     ''' x_(t + 1) is x
@@ -118,7 +122,7 @@ def f(x, g_t, sigma, mu):
     p_abs = norm.pdf(x, loc=mu[0], scale=sigma[0])
 
     post = (g_t * p_pres) / (g_t * p_pres + (1 - g_t) * p_abs)
-    #TO DO: put all in exponent
+    # TO DO: put all in exponent
 
     # if sigma[0] < sigma[1] and isinstance(x, np.ndarray) and np.any(np.isnan(x)):
     #     NaNmin = np.nanargmin(post)
@@ -135,33 +139,35 @@ def f(x, g_t, sigma, mu):
 
     return post
 
+
 def contraction_find(f, eval_res, layers, init_min, init_max):
     '''
     find the zero of a function on the interval init_min to init_max,
     f must be monotonic on this given interval
     '''
-    testspace = np.linspace(init_min, init_max, num = eval_res)
+    testspace = np.linspace(init_min, init_max, num=eval_res)
     for i in range(layers):
         f_space = f(testspace)
         asign = np.sign(f_space)
         signchange = ((np.roll(asign, 1) - asign) != 0).astype(int)
         if np.all(signchange[1:] == 0):
-            #this will sometime come up because numerical errors
-            #in f give artificial peaks indicating
-            #that it may have a zero when it doesn't
-             print('f has no zero on given interval (init_min, init_max)')
-             return np.NaN
-        new_end = testspace[np.argmax(signchange[1:])+1]
+            # this will sometime come up because numerical errors
+            # in f give artificial peaks indicating
+            # that it may have a zero when it doesn't
+            print('f has no zero on given interval (init_min, init_max)')
+            return np.NaN
+        new_end = testspace[np.argmax(signchange[1:]) + 1]
         new_begin = testspace[np.argmax(signchange[1:])]
-        root = new_end - (new_end - new_begin)/2
-        testspace = np.linspace(new_begin, new_end, num = eval_res)
+        root = new_end - (new_end - new_begin) / 2
+        testspace = np.linspace(new_begin, new_end, num=eval_res)
     return root
+
 
 def get_rootgrid(sigma, mu, k):
     testx = np.linspace(-50, 50, 10000)
     testeval = f(testx, 0.5, sigma, mu)
-    #k factor truncated to deal with boundry conditions
-    real_k = int(size*k - 2*np.floor(k/2))
+    # k factor truncated to deal with boundry conditions
+    real_k = int(size * k - 2 * np.floor(k / 2))
     if sigma[1] < sigma[0]:
         ourpeak = testx[np.argmax(testeval)]
     elif sigma[0] < sigma[1]:
@@ -189,9 +195,10 @@ def get_rootgrid(sigma, mu, k):
                 rootgrid[i, j, 0] = contraction_find(rootfunc, 30, 4, -100, ourpeak)
                 rootgrid[i, j, 1] = contraction_find(rootfunc, 30, 4, ourpeak, 100)
             elif skiproot:
-                    rootgrid[i, j, 0] = np.NaN
-                    rootgrid[i, j, 1] = np.NaN
+                rootgrid[i, j, 0] = np.NaN
+                rootgrid[i, j, 1] = np.NaN
     return rootgrid
+
 
 def p_new_ev(x, g_t, sigma, mu):
     ''' The probability of a given observation x_(t+1) given our current belief
@@ -205,20 +212,22 @@ def p_new_ev(x, g_t, sigma, mu):
     else:
         return np.where(np.isnan(x), np.zeros_like(x), eval(x))
 
+
 def f_prime(x, g_t, sigma, mu):
     '''
     Analytic derivative of f
     '''
     pres_eval = g_t * norm.pdf(x, loc=mu[1], scale=sigma[1])
-    abs_eval = (1- g_t) * norm.pdf(x, loc=mu[0], scale=sigma[0])
-    a = (x - mu[1])/sigma[1]**2
-    b = (x - mu[0])/sigma[0]**2
+    abs_eval = (1 - g_t) * norm.pdf(x, loc=mu[0], scale=sigma[0])
+    a = (x - mu[1]) / sigma[1]**2
+    b = (x - mu[0]) / sigma[0]**2
 
-    gradient = -((a*pres_eval * (pres_eval + abs_eval) - \
-        pres_eval*(a*pres_eval + b*abs_eval))/(pres_eval + abs_eval)**2)
+    gradient = -((a * pres_eval * (pres_eval + abs_eval) -
+                  pres_eval * (a * pres_eval + b * abs_eval)) / (pres_eval + abs_eval)**2)
 
     return np.where(gradient == -0.0, np.full(x.shape, 1e-2), gradient)
     return gradient
+
 
 def jacobian(roots, g_t, sigma, mu):
     '''
@@ -228,19 +237,20 @@ def jacobian(roots, g_t, sigma, mu):
     '''
     # jacob = np.where(np.isnan(f_prime(roots, g_t, sigma, mu)), np.zeros_like(roots), \
     #     1/abs(f_prime(roots, g_t, sigma, mu)))
-    jacob = np.where(np.isnan(f_prime(roots, g_t, sigma, mu)), np.zeros_like(roots), \
-        1/abs(f_prime(roots, g_t, sigma, mu)))
+    jacob = np.where(np.isnan(f_prime(roots, g_t, sigma, mu)), np.zeros_like(roots),
+                     1 / abs(f_prime(roots, g_t, sigma, mu)))
     return jacob
 
-def update_probs(rootgrid, sigma, mu, resolution = 'low'):
+
+def update_probs(rootgrid, sigma, mu, resolution='low'):
     prob_grid = np.zeros((size, size))
     high_res_prob_grid = np.zeros(rootgrid.shape[:2]).T
-    k = int(np.ceil(rootgrid.shape[1]/rootgrid.shape[0]))
-    if k%1 == 1:
-        k_boundry = int(np.floor(k/2))
+    k = int(np.ceil(rootgrid.shape[1] / rootgrid.shape[0]))
+    if k % 1 == 1:
+        k_boundry = int(np.floor(k / 2))
     else:
-        k_boundry = int(np.floor(k/2)+1)
-    dg = (g_values[1] - g_values[0])/k
+        k_boundry = int(np.floor(k / 2) + 1)
+    dg = (g_values[1] - g_values[0]) / k
 
     for i in range(size):
         prob_slice = np.zeros(size)
@@ -249,18 +259,18 @@ def update_probs(rootgrid, sigma, mu, resolution = 'low'):
         roots = rootgrid[i, :, :]
         # Find the likelihood of roots x_(t+1)
         new_g_probs = p_new_ev(roots, g_t, sigma, mu)
-        new_g_probs = new_g_probs*jacobian(roots, g_t, sigma, mu)
+        new_g_probs = new_g_probs * jacobian(roots, g_t, sigma, mu)
         new_g_probs = np.sum(new_g_probs, axis=1)  # Sum across both roots
-        new_g_probs = new_g_probs  / ( np.sum(new_g_probs) * dg )  # Normalize
-        ###line above it is sometime possible to get divide by zero if the roots
-        ### are so abnormal that they all get evaluated to zero, hence will
-        ###not return full transition probabilities... caused by instability
-        ### in f function
+        new_g_probs = new_g_probs / (np.sum(new_g_probs) * dg)  # Normalize
+        # line above it is sometime possible to get divide by zero if the roots
+        # are so abnormal that they all get evaluated to zero, hence will
+        # not return full transition probabilities... caused by instability
+        # in f function
         high_res_prob_grid[:, i] = new_g_probs
-        prob_slice[1: -1] = np.sum(np.reshape(new_g_probs[k_boundry: -k_boundry], (size-2, k)), axis = 1)\
-            /(k)
-        prob_slice[0] = np.sum(new_g_probs[0: k_boundry])/k_boundry
-        prob_slice[-1] = np.sum(new_g_probs[-k_boundry:])/k_boundry
+        prob_slice[1: -1] = np.sum(np.reshape(new_g_probs[k_boundry: -k_boundry], (size - 2, k)), axis=1)\
+            / (k)
+        prob_slice[0] = np.sum(new_g_probs[0: k_boundry]) / k_boundry
+        prob_slice[-1] = np.sum(new_g_probs[-k_boundry:]) / k_boundry
         prob_grid[:, i] = prob_slice
     if resolution == 'high':
         return high_res_prob_grid
@@ -269,34 +279,38 @@ def update_probs(rootgrid, sigma, mu, resolution = 'low'):
 
 
 def g_to_D(g_t):
-    return np.log(g_t/(1-g_t))
+    return np.log(g_t / (1 - g_t))
+
 
 def D_to_g(D_t):
-    return np.exp(D_t)/(1+np.exp(D_t))
+    return np.exp(D_t) / (1 + np.exp(D_t))
+
 
 def deriv_dg_dD(D_t):
-    return D_to_g(D_t)*(1-D_to_g(D_t))
+    return D_to_g(D_t) * (1 - D_to_g(D_t))
+
 
 def p_gtp1_gt(g_t, g_tp1, sigma, mu):
     D_t = g_to_D(g_t)
     D_tp1 = g_to_D(g_tp1)
-    jacobian_factor = 1/deriv_dg_dD(D_t)
+    jacobian_factor = 1 / deriv_dg_dD(D_t)
 
-    pres_draw = g_t*norm.pdf(D_tp1, D_t+mu[1], sigma[1])
-    abs_draw = (1-g_t)*norm.pdf(D_tp1, D_t+mu[0], sigma[0])
+    pres_draw = g_t * norm.pdf(D_tp1, D_t + mu[1], sigma[1])
+    abs_draw = (1 - g_t) * norm.pdf(D_tp1, D_t + mu[0], sigma[0])
 
-    return jacobian_factor*(pres_draw+abs_draw)
+    return jacobian_factor * (pres_draw + abs_draw)
+
 
 def p_Dtp1_Dt(D_t, D_tp1, sigma, mu):
     g_t = D_to_g(D_t)
 
-    pres_draw = g_t*norm.pdf(D_tp1, D_t+mu[1], sigma[1])
-    abs_draw = (1-g_t)*norm.pdf(D_tp1, D_t+mu[0], sigma[0])
+    pres_draw = g_t * norm.pdf(D_tp1, D_t + mu[1], sigma[1])
+    abs_draw = (1 - g_t) * norm.pdf(D_tp1, D_t + mu[0], sigma[0])
 
-    return pres_draw+abs_draw
+    return pres_draw + abs_draw
 
 
-def trans_probs(sigma, mu, space = 'g'):
+def trans_probs(sigma, mu, space='g'):
     if space == 'g':
         dg = g_values[1] - g_values[0]
         prob_grid = np.zeros((size, size))
@@ -308,7 +322,7 @@ def trans_probs(sigma, mu, space = 'g'):
     if space == 'D':
         D_values = np.linspace(0, 1e2, 1e3)
         dD = D_values[1] - D_values[0]
-        prob_grid = np.zeros((len(D_values),len(D_values)))
+        prob_grid = np.zeros((len(D_values), len(D_values)))
         for i, D_t in enumerate(D_values):
             updates = p_Dtp1_Dt(D_t, D_values, sigma, mu)
             updates = updates / (np.sum(updates) * dD)
@@ -318,7 +332,7 @@ def trans_probs(sigma, mu, space = 'g'):
 
 
 def back_induct(reward, punishment, rho, sigma, mu, prob_grid, reward_scheme,
-    t_dependent = False):
+                t_dependent=False):
     dg = g_values[1] - g_values[0]
 
     # Define the reward array
@@ -354,23 +368,25 @@ def back_induct(reward, punishment, rho, sigma, mu, prob_grid, reward_scheme,
     for index in range(2, int(T / dt) + 1):
         for i in range(size):
             V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * dt)
-            #Find the maximum value b/w waiting and two decision options. Store value and identity.
+            # Find the maximum value b/w waiting and two decision options. Store value and identity.
             V_full[i, -index] = np.amax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
             decisions[i, -index] = np.argmax((V_wait, decision_vals[i, 0], decision_vals[i, 1]))
         if not t_dependent and index > 20:
-            absolute_err = np.abs(V_full[:, -index] - V_full[:, -(index-1)])
+            absolute_err = np.abs(V_full[:, -index] - V_full[:, -(index - 1)])
             converged = np.all(absolute_err[5:-5] < 1e-5)
             if converged:
                 dec_vec = decisions[:, -index]
-                #deal with degenerate cases in which there are no 1, 2s
+                # deal with degenerate cases in which there are no 1, 2s
                 dec_vec[0] = 1
                 dec_vec[-1] = 2
                 abs_threshold = np.amax(np.where(dec_vec == 1)[0])
                 pres_threshold = np.where(dec_vec == 2)[0][0]
                 dec_vec[0:abs_threshold] = 1
                 dec_vec[pres_threshold:len(dec_vec)] = 2
-                V_full = np.reshape(np.repeat(V_full[:, -index], V_full.shape[1]), (size, V_full.shape[1]))
-                decisions = np.reshape(np.repeat(dec_vec, decisions.shape[1]), (size, decisions.shape[1]))
+                V_full = np.reshape(
+                    np.repeat(V_full[:, -index], V_full.shape[1]), (size, V_full.shape[1]))
+                decisions = np.reshape(
+                    np.repeat(dec_vec, decisions.shape[1]), (size, decisions.shape[1]))
                 break
             if index == int(T / dt):
                 print('!!!backward induction did not converge to fixed point!!!')
@@ -385,15 +401,15 @@ def solve_rho(reward, punishment, reward_scheme, sigma, mu, prob_grid):
     '''
     def V_in_rho(log_rho):
         rho = np.exp(log_rho)
-        values = back_induct(reward, punishment, rho, sigma, mu, \
-            prob_grid, reward_scheme)[0]
+        values = back_induct(reward, punishment, rho, sigma, mu,
+                             prob_grid, reward_scheme)[0]
         return values[int(size / 2), 0]
 
     # when optimizing for reward this optimization should be accounted for in choosing bounds
     try:
         opt_log_rho = brentq(V_in_rho, -10 + np.log(reward), 10 + np.log(reward))
     except ValueError:
-            raise Exception("defective bounds in rho finding procedure")
+        raise Exception("defective bounds in rho finding procedure")
 
     return np.exp(opt_log_rho)
 
@@ -401,25 +417,25 @@ def solve_rho(reward, punishment, reward_scheme, sigma, mu, prob_grid):
 def simulate_observer(arglist):
     C, decisions, sigma, mu, dt = arglist
 
-    dec_vec = decisions[:,0]
+    dec_vec = decisions[:, 0]
     abs_bound = g_values[np.amax(np.where(dec_vec == 1)[0])]
     pres_bound = g_values[np.where(dec_vec == 2)[0][0]]
 
     D_t = 0
     t = 0
 
-    g_trajectory = np.ones(int(T/dt))*0.5
-    D_trajectory = np.zeros(int(T/dt))
+    g_trajectory = np.ones(int(T / dt)) * 0.5
+    D_trajectory = np.zeros(int(T / dt))
 
     while t < T:
         if C == 1:
-            D_t = norm.rvs(t * mu[C], t* sigma[C]) * dt
+            D_t = norm.rvs(t * mu[C], t * sigma[C]) * dt
         if C == 0:
-            D_t = norm.rvs(t * mu[C], t*sigma[C]) * dt
+            D_t = norm.rvs(t * mu[C], t * sigma[C]) * dt
 
         g_t = D_to_g(D_t)
-        D_trajectory[int(t/dt)] = D_t
-        g_trajectory[int(t/dt)] = g_t
+        D_trajectory[int(t / dt)] = D_t
+        g_trajectory[int(t / dt)] = g_t
         t += dt
 
         if g_t < abs_bound:
@@ -531,8 +547,9 @@ def get_single_N_likelihood(data, sim_rt, reward):
     likelihood_pertrial = (1 - lapse) * np.exp(log_like_all) + (lapse / 2) * np.exp(-reward / temp)
     return -np.sum(np.log(likelihood_pertrial))
 
+
 def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
-                                        reward_scheme, fine_model_type):
+                        reward_scheme, fine_model_type):
     sigma = np.exp(log_sigma)
     reward = np.exp(log_reward)
     punishment = -np.exp(log_punishment)
@@ -549,11 +566,12 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
         probs = trans_probs(sigma, mu)
         rho = solve_rho(reward, punishment, reward_scheme, sigma, mu, probs)
         decisions = back_induct(reward, punishment, rho, sigma, mu,
-                                                probs, reward_scheme)[1]
+                                probs, reward_scheme)[1]
         sim_rt = get_rt(sigma, mu, decisions)
         likelihood += get_single_N_likelihood(data[i], sim_rt, reward)
 
     return likelihood
+
 
 if __name__ == '__main__':
 
@@ -580,10 +598,11 @@ if __name__ == '__main__':
     if model_type[0] == 'sig':
         reward_scheme = model_type[1]
         fine_model_type = model_type[2]
+
         def subject_likelihood(params):
             log_sigma = params[0]
             return get_data_likelihood(sub_data, 0, -1e5, log_sigma,
-                reward_scheme, fine_model_type)
+                                       reward_scheme, fine_model_type)
 
         bnds = np.array(((-1.7, 1.),))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
@@ -591,11 +610,12 @@ if __name__ == '__main__':
     if model_type[0] == 'sig_reward':
         reward_scheme = model_type[1]
         fine_model_type = model_type[2]
+
         def subject_likelihood(params):
             log_sigma = params[0]
             log_reward = params[1]
-            return get_data_likelihood( sub_data, log_reward, -1e5, log_sigma,
-                reward_scheme, fine_model_type)
+            return get_data_likelihood(sub_data, log_reward, -1e5, log_sigma,
+                                       reward_scheme, fine_model_type)
 
         bnds = np.array(((-1.7, 1.), (-5., 0.5)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
@@ -604,11 +624,12 @@ if __name__ == '__main__':
     if model_type[0] == 'sig_punish':
         reward_scheme = model_type[1]
         fine_model_type = model_type[2]
+
         def subject_likelihood(params):
             log_sigma = params[0]
             log_punishment = params[1]
             return get_data_likelihood(sub_data, 0, log_punishment, log_sigma,
-                reward_scheme, fine_model_type)
+                                       reward_scheme, fine_model_type)
 
         bnds = np.array(((-1.7, 1.), (-5., -0.5)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
@@ -617,7 +638,6 @@ if __name__ == '__main__':
     xp, yp = x_opt
     # Pull out each of the log(sigma) that the optimizer tested and put them in an array together
     # with the associated log(likelihood). datarr is (N x 2) where N is the number of optimize samps
-
 
     # Plot test points and likelihoods
     fig = plt.figure()
@@ -630,7 +650,7 @@ if __name__ == '__main__':
         ax.set_ylabel('$log(reward)$')
         ax.set_zlabel('$log(likelihood)$')
 
-    if  model_type[0] == 'sig_punish':
+    if model_type[0] == 'sig_punish':
         ax.scatter(xp[:, 0], xp[:, 1], yp, s=100)
         ax.set_xlabel('$log(\sigma)$')
         ax.set_ylabel('$log(punishment)$')
@@ -656,31 +676,30 @@ if __name__ == '__main__':
         reward = 1
         punishment = 0
         fig.suptitle('Parameters: sigma = {}'.format(np.round(best_sigma, 3))
-                            + ', Reward Scheme: {},'.format(model_type[1]) \
-                            + ' Fine Model: {}'.format(model_type[2]))
+                     + ', Reward Scheme: {},'.format(model_type[1])
+                     + ' Fine Model: {}'.format(model_type[2]))
     elif model_type[0] == 'sig_reward':
         reward = np.exp(best_params[1])
         punishment = 0
         fig.suptitle('Parameters: sigma = {}'.format(np.round(best_sigma, 3))
-                            + '; reward = {}'.format(np.round(reward, 3))
-                            + ', Reward Scheme: {},'.format(model_type[1]) \
-                            + ' Fine Model: {}'.format(model_type[2]))
+                     + '; reward = {}'.format(np.round(reward, 3))
+                     + ', Reward Scheme: {},'.format(model_type[1])
+                     + ' Fine Model: {}'.format(model_type[2]))
     elif model_type[0] == 'sig_punish':
         punishment = np.exp(best_params[1])
         reward = 1
         fig.suptitle('Parameters: sigma = {}'.format(np.round(best_sigma, 3))
-                            + '; punishment = {}'.format(np.round(punishment))
-                            + ', Reward Scheme: {},'.format(model_type[1]) \
-                            + ' Fine Model: {}'.format(model_type[2]))
+                     + '; punishment = {}'.format(np.round(punishment))
+                     + ', Reward Scheme: {},'.format(model_type[1])
+                     + ' Fine Model: {}'.format(model_type[2]))
 
     data_array = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
-            sub_data.query('setsize == 16')]
+                  sub_data.query('setsize == 16')]
 
     all_rt = {}
     display_con = ('pres', 'abs')
     for n_con in it.product(N_array, display_con):
         all_rt[n_con] = []
-
 
     stats = get_coarse_stats(best_sigma, d_map_samples, model_type[2])
 
@@ -720,7 +739,7 @@ if __name__ == '__main__':
 
     plt.savefig(savepath + '/subject_{}_bayes_opt_bestfits.png'.format(subject_num))
 
-    fw = open(savepath + '/subject_{}_simrt_and_params.p', 'wb')
+    fw = open(savepath + '/subject_{}_simrt_and_params.p'.format(subject_num), 'wb')
     outdict = {'best_sigma': best_params[0], 'best_reward': best_params[1], 'sim_rts': all_rt,
                'coarse_stats': stats}
     pickle.dump(outdict, fw)
