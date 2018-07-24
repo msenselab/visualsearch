@@ -542,13 +542,10 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
             sub_data.query('setsize == 16')]
 
     stats = get_coarse_stats(sigma, d_map_samples, fine_model_type)
-    # print(stats)
 
     for i in range(stats.shape[0]):
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
-        # rootgrid = get_rootgrid(sigma, mu, k)
-        # probs = update_probs(rootgrid, sigma, mu)
         probs = trans_probs(sigma, mu)
         rho = solve_rho(reward, punishment, reward_scheme, sigma, mu, probs)
         decisions = back_induct(reward, punishment, rho, sigma, mu,
@@ -560,7 +557,7 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
 
 if __name__ == '__main__':
 
-    model_type = ('sig_punish', 'epsilon_punish', 'const')
+    model_type = ('sig_punish', 'epsilon_punish', 'sqrt')
     iter_bayesian_opt = 15
     '''model type is formated as tuple with first argument denoting parameters to fits;
         options are:

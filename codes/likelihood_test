@@ -1,0 +1,34 @@
+'''
+May 2018
+tests likelihood function
+'''
+
+import sys
+import itertools as it
+import seaborn as sns
+from scipy.optimize import brentq
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.animation import FuncAnimation, writers
+from scipy.stats import gaussian_kde, norm
+import pandas as pd
+from pathlib import Path
+import pickle
+from gauss_opt import bayesian_optimisation
+from dynamic_adhoc_twosigma import posterior
+import numpy as np
+from dyn_case_multi_model import stats, trans_probs, solve_rho, back_induct
+
+def gen_data(params, model_type):
+    stats = get_coarse_stats(sigma, d_map_samples, fine_model_type)
+
+    for i in range(stats.shape[0]):
+        mu = stats[i, :, 0]
+        sigma = stats[i, :, 1]
+        # rootgrid = get_rootgrid(sigma, mu, k)
+        # probs = update_probs(rootgrid, sigma, mu)
+        probs = trans_probs(sigma, mu)
+        rho = solve_rho(reward, punishment, reward_scheme, sigma, mu, probs)
+        decisions = back_induct(reward, punishment, rho, sigma, mu,
+                                                probs, reward_scheme)[1]
+        sim_rt = get_rt(sigma, mu, decisions)
