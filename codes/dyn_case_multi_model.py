@@ -409,85 +409,75 @@ def simulate_observer(arglist):
     t = 0
 
     g_trajectory = np.ones(int(T/dt))*0.5
+    D_trajectory = np.zeros(int(T/dt))
 
     while t < T:
         if C == 1:
-            D_t = norm.rvs(D_t + mu[C], sigma[C]) * dt
+            D_t = norm.rvs(t * mu[C], t* sigma[C]) * dt
         if C == 0:
-            D_t = norm.rvs(D_t + mu[C], sigma[C]) * dt
-        g_t = D_to_g(D_t)
+            D_t = norm.rvs(t * mu[C], t*sigma[C]) * dt
 
+        g_t = D_to_g(D_t)
+        D_trajectory[int(t/dt)] = D_t
         g_trajectory[int(t/dt)] = g_t
         t += dt
 
         if g_t < abs_bound:
-            return (1, t, g_trajectory)
+#            plt.plot(g_trajectory*100)
+            return (1, t, g_trajectory, D_trajectory)
+
         if g_t > pres_bound:
-            return (2, t, g_trajectory)
+#            plt.plot(g_trajectory*100)
+            return (2, t, g_trajectory, D_trajectory)
 
-    return (0, T, g_trajectory)
+#    plt.plot(g_trajectory*100)
+    return (0, T, g_trajectory, D_trajectory)
 
 
-
-# def simulate_observer(arglist):
-#     C, decisions, sigma, mu, dt = arglist
-#     step = 0
+# def alt_sim(prob_grid, decisions):
+#     ##COMPUTEs prob distribution and not density
+#     dg = (g_values[1] - g_values[0])
+#
+#     g_t = np.zeros(prob_grid.shape[0])
+#     g_t[int(len(g_t)/2)] = 1
+#
+#     D_t = np.zeros
+#
+#     dec_vec = decisions[:,0]
+#     abs_threshold = np.amax(np.where(dec_vec == 1)[0])
+#     pres_threshold = np.where(dec_vec == 2)[0][0]
+#
+#     resp_dist = np.zeros((2, int(T/dt)))
+#     dist_evo = np.zeros((prob_grid.shape[0], int(T/dt)))
 #     t = 0
-#     g_t = np.ones(int(T / dt)) * 0.5
-#     while t < (T - dt):
-#         step += 1
-#         t = step * dt
-#         x_t = np.random.normal(mu[C], sigma[C]) * dt
-#         g_t[step] = posterior(x_t, g_t[step - 1], C, sigma, mu)
-#         nearest_grid = np.abs(g_values - g_t[step]).argmin()
-#         decision_t = decisions[nearest_grid, step]
-#         if decision_t != 0:
-#             break
-#     return (decision_t, t, g_t)
-
-
-def alt_sim(prob_grid, decisions):
-    ##COMPUTEs prob distribution and not density
-    dg = (g_values[1] - g_values[0])
-
-    g_t = np.zeros(prob_grid.shape[0])
-    g_t[int(len(g_t)/2)] = 1
-
-    dec_vec = decisions[:,0]
-    abs_threshold = np.amax(np.where(dec_vec == 1)[0])
-    pres_threshold = np.where(dec_vec == 2)[0][0]
-
-    resp_dist = np.zeros((2, int(T/dt)))
-    dist_evo = np.zeros((prob_grid.shape[0], int(T/dt)))
-    t = 0
-    remaining_density = 1
-    while t < (T-dt):
-        dist_evo[:, int(t/dt)] = g_t
-        abs_cum_density = np.sum(g_t[:abs_threshold])
-        pres_cum_density = np.sum(g_t[pres_threshold:])
-
-        resp_dist[0, int(t/dt)] = abs_cum_density
-        resp_dist[1, int(t/dt)] = pres_cum_density
-
-        remaining_density = remaining_density - (abs_cum_density + pres_cum_density)
-
-        print(remaining_density)
-
-        g_t = g_t/remaining_density
-
-        g_t = np.matmul(prob_grid[:,abs_threshold:pres_threshold], g_t[abs_threshold:pres_threshold])
-
-        t += dt
-
-    plt.figure()
-    plt.imshow(dist_evo[:, 5:])
-    plt.axhline(y = abs_threshold)
-    plt.axhline(y = pres_threshold)
-
-    resp_abs = resp_dist[0,:]/np.sum(resp_dist[0,:])
-    resp_pres = resp_dist[1,:]/np.sum(resp_dist[1,:])
-
-    return resp_abs, resp_pres, dist_evo
+#     remaining_density = 1
+#     while t < (T-dt):
+#         dist_evo[:, int(t/dt)] = g_t
+#         abs_cum_density = np.sum(g_t[:abs_threshold])
+#         pres_cum_density = np.sum(g_t[pres_threshold:])
+#
+#         resp_dist[0, int(t/dt)] = abs_cum_density
+#         resp_dist[1, int(t/dt)] = pres_cum_density
+#
+#         remaining_density = remaining_density - (abs_cum_density + pres_cum_density)
+#
+#         print(remaining_density)
+#
+#         g_t = g_t/remaining_density
+#
+#         g_t = np.matmul(prob_grid[:,abs_threshold:pres_threshold], g_t[abs_threshold:pres_threshold])
+#
+#         t += dt
+#
+#     plt.figure()
+#     plt.imshow(dist_evo[:, 5:])
+#     plt.axhline(y = abs_threshold)
+#     plt.axhline(y = pres_threshold)
+#
+#     resp_abs = resp_dist[0,:]/np.sum(resp_dist[0,:])
+#     resp_pres = resp_dist[1,:]/np.sum(resp_dist[1,:])
+#
+#     return resp_abs, resp_pres, dist_evo
 
 
 def get_rt(sigma, mu, decisions):
@@ -499,9 +489,6 @@ def get_rt(sigma, mu, decisions):
     for arglist in arglists:
         observer_outputs.append(simulate_observer(arglist))
     response_times = np.array([x[1] for x in observer_outputs])
-    plt.figure()
-    plt.imshow(decisions)
-    [plt.plot(x[2]*100) for x in observer_outputs]
     return response_times.reshape(2, numsims)
 
 
@@ -551,7 +538,7 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
                                         reward_scheme, fine_model_type):
     sigma = np.exp(log_sigma)
     reward = np.exp(log_reward)
-    punishment = np.exp(log_punishment)
+    punishment = -np.exp(log_punishment)
     print(sigma, reward, punishment)
     likelihood = 0
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
@@ -575,6 +562,7 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
     return likelihood
 
 if __name__ == '__main__':
+
     model_type = ('sig_punish', 'epsilon_punish', 'const')
     iter_bayesian_opt = 15
     '''model type is formated as tuple with first argument denoting parameters to fits;
@@ -636,8 +624,7 @@ if __name__ == '__main__':
     # Pull out each of the log(sigma) that the optimizer tested and put them in an array together
     # with the associated log(likelihood). datarr is (N x 2) where N is the number of optimize samps
     # datarr = np.array((x_opt[0].reshape(-1), x_opt[1])).T
-    #
-    # sortdatarr = datarr[np.argsort(datarr[:, 0]), :]
+
 
     # Plot test points and likelihoods
     fig = plt.figure()
@@ -680,7 +667,7 @@ if __name__ == '__main__':
         punishment = np.exp(best_params[1])
         reward = 1
         fig.suptitle('Parameters: sigma = {}'.format(np.round(best_sigma, 3))
-                            + '; punishment = {}'.format(np.round(reward))
+                            + '; punishment = {}'.format(np.round(punishment))
                             + ', Reward Scheme: {},'.format(model_type[1]) \
                             + ' Fine Model: {}'.format(model_type[2]))
 
