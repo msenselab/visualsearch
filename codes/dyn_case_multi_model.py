@@ -617,16 +617,24 @@ if __name__ == '__main__':
     xp, yp = x_opt
     # Pull out each of the log(sigma) that the optimizer tested and put them in an array together
     # with the associated log(likelihood). datarr is (N x 2) where N is the number of optimize samps
-    # datarr = np.array((x_opt[0].reshape(-1), x_opt[1])).T
 
 
     # Plot test points and likelihoods
     fig = plt.figure()
     ax = Axes3D(fig)
-    ax.scatter(xp[:, 0], xp[:, 1], yp, s=100)
-    ax.set_xlabel('$log(\sigma)$')
-    ax.set_ylabel('$log(reward)$')
-    ax.set_zlabel('$log(likelihood)$')
+    if model_type[0] == 'sig':
+        ax.scatter(xp[:, 0], yp, s=100)
+    if model_type[0] == 'sig_reward':
+        ax.scatter(xp[:, 0], xp[:, 1], yp, s=100)
+        ax.set_xlabel('$log(\sigma)$')
+        ax.set_ylabel('$log(reward)$')
+        ax.set_zlabel('$log(likelihood)$')
+
+    if  model_type[0] == 'sig_punish':
+        ax.scatter(xp[:, 0], xp[:, 1], yp, s=100)
+        ax.set_xlabel('$log(\sigma)$')
+        ax.set_ylabel('$log(punishment)$')
+        ax.set_zlabel('$log(likelihood)$')
 
     # def anim_update(i):
     #     ax.azim = (i / 540) * 360
@@ -679,8 +687,6 @@ if __name__ == '__main__':
     for i in range(stats.shape[0]):
         mu = stats[i, :, 0]
         sigma = stats[i, :, 1]
-        # rootgrid = get_rootgrid(sigma, mu, k)
-        # prob_grid = update_probs(rootgrid, sigma, mu)
         prob_grid = trans_probs(sigma, mu)
         rho = solve_rho(reward, punishment, model_type[1], sigma, mu, prob_grid)
         decisions = back_induct(reward, punishment, rho, sigma, mu, prob_grid, model_type[1])[1]
