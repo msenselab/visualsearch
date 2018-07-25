@@ -323,32 +323,32 @@ def get_rt(sigma, mu, decisions, numsims = 5000):
 def get_single_N_likelihood(data, sim_rt, reward):
 
     #simulated response times for C = 0
-    abs_rt = sim_rt[0]
+    abs_sim_rt = sim_rt[0]
     #simulated response times for C = 1
-    pres_rt = sim_rt[1]
+    pres_sim_rt = sim_rt[1]
 
     # Simulated model distribution for resp = 0, C = 0
-    abs_0_sim_rt = np.array(abs_rt[np.where(abs_rt[:,0] == 0)[0]])[:,1]
+    abs_0_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] == 0)[0]])[:,1]
     abs_0_sim_rt_dist = gaussian_kde(abs_0_sim_rt, bw_method=0.1)
 
     # Simulated model distribution for resp = 1, C = 1
-    pres_1_sim_rt = np.array(pres_rt[np.where(pres_rt[:,0] == 1)[0]])[:,1]
+    pres_1_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] == 1)[0]])[:,1]
     pres_1_sim_rt_dist = gaussian_kde(pres_1_sim_rt, bw_method=0.1)
 
     # Simulated model distribution for resp = 1, C = 0
-    if np.all(abs_rt[:, 0] == True):
+    if np.all(abs_sim_rt[:, 0] == True):
         # filler distribution as frac_pres_cor will eval to 0
         abs_1_sim_rt = np.random.uniform()
     else:
-        abs_1_sim_rt = np.array(abs_rt[np.where(abs_rt[:,0] == 1)[0]])[:,1]
+        abs_1_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] == 1)[0]])[:,1]
     abs_1_sim_rt_dist = gaussian_kde(abs_1_sim_rt, bw_method=0.1)
 
     # Simulated model distribution for resp = 0, C = 1
-    if np.all(pres_rt[:, 0] == True):
+    if np.all(pres_sim_rt[:, 0] == True):
         # filler distribution as frac_pres_inc will eval to 0
         pres_0_sim_rt = np.random.uniform()
     else:
-        pres_0_sim_rt = np.array(pres_rt[np.where(pres_rt[:,0] == 0)[0]])[:,1]
+        pres_0_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] == 0)[0]])[:,1]
 
     pres_0_sim_rt_dist = gaussian_kde(pres_0_sim_rt, bw_method=0.1)
 
@@ -404,7 +404,6 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_sigma,
     return likelihood
 
 if __name__ == '__main__':
-
     model_type = ('sig_punish', 'epsilon_punish', 'sqrt')
     iter_bayesian_opt = 15
     '''model type is formated as tuple with first argument denoting parameters to fits;
