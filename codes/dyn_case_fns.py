@@ -244,3 +244,8 @@ def discrimination_check(stats):
         denom = np.sqrt(0.5 * (stats_N[0, 1] + stats_N[1, 1]))
         d_prime[i] = delta_mu/denom
     return d_prime
+
+    # if np.var(pres_1_sim_rt) == 0:
+    #     mean = np.mean(pres_1_sim_rt)
+    #     perturb = norm.rvs(mean, 0.01)
+    #     pres_1_sim_rt[0] = mean + perturb

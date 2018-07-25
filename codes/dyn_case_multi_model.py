@@ -322,20 +322,20 @@ def get_rt(sigma, mu, decisions, numsims = 5000):
 
 def get_single_N_likelihood(data, sim_rt, reward):
 
-    #simulate response times for C = 0
+    #simulated response times for C = 0
     abs_rt = sim_rt[0]
-    #simulate response times for C = 1
+    #simulated response times for C = 1
     pres_rt = sim_rt[1]
 
-    # Simulate model distribution for resp = 0, C = 0
+    # Simulated model distribution for resp = 0, C = 0
     abs_0_sim_rt = np.array(abs_rt[np.where(abs_rt[:,0] == 0)[0]])[:,1]
     abs_0_sim_rt_dist = gaussian_kde(abs_0_sim_rt, bw_method=0.1)
 
-    # Simulate model distribution for resp = 1, C = 1
+    # Simulated model distribution for resp = 1, C = 1
     pres_1_sim_rt = np.array(pres_rt[np.where(pres_rt[:,0] == 1)[0]])[:,1]
     pres_1_sim_rt_dist = gaussian_kde(pres_1_sim_rt, bw_method=0.1)
 
-    # Simulate model distribution for resp = 1, C = 0
+    # Simulated model distribution for resp = 1, C = 0
     if np.all(abs_rt[:, 0] == True):
         # filler distribution as frac_pres_cor will eval to 0
         abs_1_sim_rt = np.random.uniform()
@@ -343,7 +343,7 @@ def get_single_N_likelihood(data, sim_rt, reward):
         abs_1_sim_rt = np.array(abs_rt[np.where(abs_rt[:,0] == 1)[0]])[:,1]
     abs_1_sim_rt_dist = gaussian_kde(abs_1_sim_rt, bw_method=0.1)
 
-    # Simulate model distribution for resp = 0, C = 1
+    # Simulated model distribution for resp = 0, C = 1
     if np.all(pres_rt[:, 0] == True):
         # filler distribution as frac_pres_inc will eval to 0
         pres_0_sim_rt = np.random.uniform()
