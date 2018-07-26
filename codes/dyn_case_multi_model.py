@@ -315,7 +315,7 @@ def get_rt(sigma, mu, decisions, numsims = 5000):
 
     return (abs_info, pres_info)
 
-def get_kde_dist(sim_rt):
+def get_kde_dist(sim_rt, plot = False):
     # 2x2 matrix of distributions, i (row) is the underlying condition C
     # and j (column) is the response
     dist = []
@@ -332,6 +332,14 @@ def get_kde_dist(sim_rt):
                 if np.var(i_j_sim_rt) == 0 or i_j_sim_rt.size == 1:
                 # if they are all the same, perturb to allow kde
                     i_j_sim_rt = np.append(i_j_sim_rt, i_j_sim_rt[0] + perturb)
+                if plot:
+                    if i == 0:
+                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'purple',
+                                    label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
+                    else:
+                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'yellow',
+                                    label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
+
                 dist.append(gaussian_kde(i_j_sim_rt, bw_method=0.1))
     return np.reshape(dist, (2,2))
 
@@ -394,7 +402,7 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
     return likelihood
 
 if __name__ == '__main__':
-    model_type = ('sig_punish', 'epsilon_punish', 'const')
+    model_type = ('sig_punish', 'epsilon_punish', 'sqrt')
     iter_bayesian_opt = 15
     '''model type is formated as tuple with first argument denoting parameters to fits;
         options are:
@@ -473,16 +481,6 @@ if __name__ == '__main__':
         ax.set_ylabel('$log(punishment)$')
         ax.set_zlabel('$log(likelihood)$')
 
-    # def anim_update(i):
-    #     ax.azim = (i / 540) * 360
-    #     plt.draw()
-    #     return
-    #
-    # Writer = writers['ffmpeg']
-    # writer = Writer(fps=60, bitrate=1800)
-    # anim = FuncAnimation(fig, anim_update, frames=360)
-    # anim.save(savepath + '/subject_{}_bayes_opt_testpoints.mp4'.format(subject_num), writer=writer)
-
     # # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
     fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
@@ -528,7 +526,9 @@ if __name__ == '__main__':
         rho = solve_rho(reward, punishment, model_type[1], sigma, mu, prob_grid)
         decisions = back_induct(reward, punishment, rho, sigma, mu, prob_grid, model_type[1])[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        all_rt[N_array[i], 'pres'].append(sim_rt)
+        all_rt[N_array[i], 'abs'].append(sim_rt[0][:,1])
+        all_rt[N_array[i], 'pres'].append(sim_rt[1][:,1])
+
         plt.figure()
         plt.title(str(N_array[i]))
         plt.imshow(decisions)
@@ -543,10 +543,12 @@ if __name__ == '__main__':
 
         ax = axes[i]
         ax.set_title('N = {}'.format(N_array[i]))
-        sns.kdeplot(sim_rt[1], bw=0.1, shade=True, label='Sim corr pres', color='blue', ax=ax)
-        sns.kdeplot(sim_rt[0], bw=0.1, shade=True, label='Sim corr abs', color='orange', ax=ax)
-        sns.kdeplot(abs_rts_0, bw=0.1, shade=True, label='Data corr abs', color='red', ax=ax)
-        sns.kdeplot(pres_rts_1, bw=0.1, shade=True, label='Data corr pres', color='darkblue', ax=ax)
+        sns.kdeplot(abs_rts_0, bw=0.1, shade=True, label='Data: con. = 0, resp. = 0',
+                    color='darkblue', ax=ax)
+        sns.kdeplot(pres_rts_1, bw=0.1, shade=True, label='Data: con. = 1, resp. = 1',
+                    color='red', ax=ax)
+
+        get_kde_dist(sim_rt, plot = True)
 
         ax.set_ylabel('Density estimate')
         ax.legend()
