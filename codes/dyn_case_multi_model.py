@@ -329,7 +329,7 @@ def get_kde_dist(sim_rt):
         cur_rt = sim_rt[i]
         for j in range(2):
             if i == j: #logic for correct response
-                if np.all(cur_rt[:,0] == (i+1)&1 or np.isnan(cur_rt[:, 0])):
+                if not np.any(cur_rt[:,0] == j):
                     # case where there are no correct response
                     dist[i,j] = uniform
                 else:
@@ -361,28 +361,26 @@ def get_single_N_likelihood(data, sim_rt, reward):
     #simulated response times for C = 1
     pres_sim_rt = sim_rt[1]
 
+    perturb = norm.rvs(0, 0.01)
+
     # Simulated model distribution for resp = 0, C = 0
-    if np.all(abs_sim_rt[:, 0] == 1 or np.isnan(abs_sim_rt[:, 0])):
+    if not np.any(abs_sim_rt[:, 0] == 0): #case where there are no correct responses
         # filler distribution as frac_pres_cor will eval to 0
         abs_0_sim_rt_dist = uniform
     else:
         abs_0_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] == 0)[0]])[:,1]
         if np.var(abs_0_sim_rt) == 0:
-            mean = np.mean(abs_0_sim_rt)
-            perturb = norm.rvs(mean, 0.01)
-            abs_0_sim_rt[0] = mean + perturb
+            abs_0_sim_rt[0] += perturb
         abs_0_sim_rt_dist = gaussian_kde(abs_0_sim_rt, bw_method=0.1)
 
     # Simulated model distribution for resp = 1, C = 1
-    if np.all(pres_sim_rt[:, 0] == 0 or np.isnan(pres_sim_rt[:, 0])):
+    if not np.any(pres_sim_rt[:,0] == 1):
         # filler distribution as frac_pres_cor will eval to 0
         pres_1_sim_rt_dist = uniform
     else:
         pres_1_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] == 1)[0]])[:,1]
         if np.var(pres_1_sim_rt) == 0:
-            mean = np.mean(pres_1_sim_rt)
-            perturb = norm.rvs(mean, 0.01)
-            pres_1_sim_rt[0] = mean + perturb
+            pres_1_sim_rt[0] += perturb
         pres_1_sim_rt_dist = gaussian_kde(pres_1_sim_rt, bw_method=0.1)
 
     # Simulated model distribution for resp = 1, C = 0
@@ -390,7 +388,7 @@ def get_single_N_likelihood(data, sim_rt, reward):
         # filler distribution as frac_pres_cor will eval to 0
         abs_1_sim_rt_dist = uniform
     else:
-        abs_1_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] == 1 or np.isnan(abs_sim_rt[:,0]))[0]])[:,1]
+        abs_1_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] != 0)[0]])[:,1]
         if np.var(abs_1_sim_rt) == 0:
             mean = np.mean(abs_1_sim_rt)
             perturb = norm.rvs(mean, 0.01)
@@ -402,7 +400,7 @@ def get_single_N_likelihood(data, sim_rt, reward):
         # filler distribution as frac_pres_inc will eval to 0
         pres_0_sim_rt_dist = uniform
     else:
-        pres_0_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] == 0 or np.isnan(abs_sim_rt[:,0]))[0]])[:,1]
+        pres_0_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] != 1)[0]])[:,1]
         if np.var(pres_0_sim_rt) == 0:
             mean = np.mean(pres_0_sim_rt)
             perturb = norm.rvs(mean, 0.01)
