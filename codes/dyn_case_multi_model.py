@@ -257,8 +257,6 @@ def simulate_observer(arglist):
 
     return (np.NaN, T, g_trajectory, D_trajectory)
 
-
-
 # def alt_sim(prob_grid, decisions):
 #     ##COMPUTEs prob distribution and not density
 #     dg = (g_values[1] - g_values[0])
@@ -304,7 +302,6 @@ def simulate_observer(arglist):
 #
 #     return resp_abs, resp_pres, dist_evo
 
-
 def get_rt(sigma, mu, decisions, numsims = 5000):
     C_vals = [0] * numsims
     C_vals.extend([1] * numsims)
@@ -318,95 +315,32 @@ def get_rt(sigma, mu, decisions, numsims = 5000):
 
     return (abs_info, pres_info)
 
-
 def get_kde_dist(sim_rt):
     # 2x2 matrix of distributions, i (row) is the underlying condition C
     # and j (column) is the response
-    dist = np.zeros((2,2))
+    dist = []
     perturb = norm.rvs(0, 0.01)
-
     for i in range(2):
         cur_rt = sim_rt[i]
         for j in range(2):
-            if i == j: #logic for correct response
-                if not np.any(cur_rt[:,0] == j):
-                    # case where there are no correct response
-                    dist[i,j] = uniform
-                else:
-                    # pick out all the correct response
-                    i_j_sim_rt = np.array(cur_rt[np.where(cur_rt[:,0] == i)[0]])[:,1]
-                    # if they are all the same, perturb to allow kde
-                    if np.var(i_j_sim_rt) == 0:
-                        i_j_sim_rt[0] += perturb
-                    dist[i,j] = gaussian_kde(i_j_sim_rt, bw_method=0.1)
+            if not np.any(cur_rt[:,0] == j):
+                # case where there are none of the responses given in the model simulation
+                dist.append(uniform)
+            else:
+                i_j_sim_rt = np.array(cur_rt[np.where(cur_rt[:,0] == j)[0]])[:,1]
+                # if they are all the same or of size 1, perturb to allow kde
+                if np.var(i_j_sim_rt) == 0 or i_j_sim_rt.size == 1:
+                # if they are all the same, perturb to allow kde
+                    i_j_sim_rt = np.append(i_j_sim_rt, i_j_sim_rt[0] + perturb)
+                dist.append(gaussian_kde(i_j_sim_rt, bw_method=0.1))
+    return np.reshape(dist, (2,2))
 
-            if i != j: #logic for incorrect response
-                if np.all(cur_rt[:, 0] == i):
-                    # case where all responses are correct
-                    dist[i,j] = uniform
-                else:
-                    # pick out all the incorrect response
-                    i_j_sim_rt = np.array(cur_rt[np.where(cur_rt[:,0] == j
-                                            or np.isnan(cur_rt[:,0]))[0]])[:,1]
-                    if np.var(i_j_sim_rt) == 0:
-                    # if they are all the same, perturb to allow kde
-                        i_j_sim_rt[0] += perturb
-                    dist[i,j] = gaussian_kde(i_j_sim_rt, bw_method=0.1)
-    return dist
+def get_single_N_likelihood(data, dist_matrix, reward):
 
-def get_single_N_likelihood(data, sim_rt, reward):
-
-    #simulated response times for C = 0
-    abs_sim_rt = sim_rt[0]
-    #simulated response times for C = 1
-    pres_sim_rt = sim_rt[1]
-
-    perturb = norm.rvs(0, 0.01)
-
-    # Simulated model distribution for resp = 0, C = 0
-    if not np.any(abs_sim_rt[:, 0] == 0): #case where there are no correct responses
-        # filler distribution as frac_pres_cor will eval to 0
-        abs_0_sim_rt_dist = uniform
-    else:
-        abs_0_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] == 0)[0]])[:,1]
-        if np.var(abs_0_sim_rt) == 0:
-            abs_0_sim_rt[0] += perturb
-        abs_0_sim_rt_dist = gaussian_kde(abs_0_sim_rt, bw_method=0.1)
-
-    # Simulated model distribution for resp = 1, C = 1
-    if not np.any(pres_sim_rt[:,0] == 1):
-        # filler distribution as frac_pres_cor will eval to 0
-        pres_1_sim_rt_dist = uniform
-    else:
-        pres_1_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] == 1)[0]])[:,1]
-        if np.var(pres_1_sim_rt) == 0:
-            pres_1_sim_rt[0] += perturb
-        pres_1_sim_rt_dist = gaussian_kde(pres_1_sim_rt, bw_method=0.1)
-
-    # Simulated model distribution for resp = 1, C = 0
-    if np.all(abs_sim_rt[:, 0] == 0):
-        # filler distribution as frac_pres_cor will eval to 0
-        abs_1_sim_rt_dist = uniform
-    else:
-        abs_1_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] != 0)[0]])[:,1]
-        if np.var(abs_1_sim_rt) == 0:
-            mean = np.mean(abs_1_sim_rt)
-            perturb = norm.rvs(mean, 0.01)
-            abs_1_sim_rt[0] = mean + perturb
-        abs_1_sim_rt_dist = gaussian_kde(abs_1_sim_rt, bw_method=0.1)
-
-    # Simulated model distribution for resp = 0, C = 1
-    if np.all(pres_sim_rt[:, 0] == 1):
-        # filler distribution as frac_pres_inc will eval to 0
-        pres_0_sim_rt_dist = uniform
-    else:
-        pres_0_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] != 1)[0]])[:,1]
-        if np.var(pres_0_sim_rt) == 0:
-            mean = np.mean(pres_0_sim_rt)
-            perturb = norm.rvs(mean, 0.01)
-            pres_0_sim_rt[0] = mean + perturb
-        pres_0_sim_rt_dist = gaussian_kde(pres_0_sim_rt, bw_method=0.1)
-
+    abs_0_sim_rt_dist = dist_matrix[0,0]
+    pres_1_sim_rt_dist = dist_matrix[1,1]
+    abs_1_sim_rt_dist = dist_matrix[0, 1]
+    pres_0_sim_rt_dist = dist_matrix[1, 0]
 
     pres_rts_0 = data.query('resp == 2 & target == \'Present\'').rt.values
     pres_rts_1 = data.query('resp == 1 & target == \'Present\'').rt.values
@@ -454,12 +388,13 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
         decisions = back_induct(reward, punishment, rho, sigma, mu,
                                                 probs, reward_scheme)[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        likelihood += get_single_N_likelihood(data[i], sim_rt, reward)
+        dist_matrix = get_kde_dist(sim_rt)
+        likelihood += get_single_N_likelihood(data[i], dist_matrix, reward)
 
     return likelihood
 
 if __name__ == '__main__':
-    model_type = ('sig_reward', 'asym_reward', 'const')
+    model_type = ('sig_punish', 'epsilon_punish', 'const')
     iter_bayesian_opt = 15
     '''model type is formated as tuple with first argument denoting parameters to fits;
         options are:
@@ -499,7 +434,7 @@ if __name__ == '__main__':
             return get_data_likelihood( sub_data, log_reward, -1e5, log_sigma,
                 reward_scheme, fine_model_type)
 
-        bnds = np.array(((-1.7, 1.), (-5., 0.5)))  # [n_variables, 2] shaped array with bounds
+        bnds = np.array(((-1.7, 1.), (-1., 0.5)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=iter_bayesian_opt, sample_loss=subject_likelihood,
                                       bounds=bnds, n_pre_samples=15)
 
