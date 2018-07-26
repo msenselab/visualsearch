@@ -249,3 +249,60 @@ def discrimination_check(stats):
     #     mean = np.mean(pres_1_sim_rt)
     #     perturb = norm.rvs(mean, 0.01)
     #     pres_1_sim_rt[0] = mean + perturb
+
+        # #simulated response times for C = 0
+        # abs_sim_rt = sim_rt[0]
+        # #simulated response times for C = 1
+        # pres_sim_rt = sim_rt[1]
+        #
+        # perturb = norm.rvs(0, 0.01)
+        #
+        # # Simulated model distribution for resp = 0, C = 0
+        # if not np.any(abs_sim_rt[:, 0] == 0): #case where there are no correct responses
+        #     # filler distribution as frac_pres_cor will eval to 0
+        #     abs_0_sim_rt_dist = uniform
+        # else:
+        #     abs_0_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] == 0)[0]])[:,1]
+        #     if np.var(abs_0_sim_rt) == 0 or abs_0_sim_rt.size == 1:
+        #         abs_0_sim_rt = np.append(abs_0_sim_rt, abs_0_sim_rt[0] + perturb)
+        #     abs_0_sim_rt_dist = gaussian_kde(abs_0_sim_rt, bw_method=0.1)
+        #
+        # # Simulated model distribution for resp = 1, C = 1
+        # if not np.any(pres_sim_rt[:,0] == 1):
+        #     # filler distribution as frac_pres_cor will eval to 0
+        #     pres_1_sim_rt_dist = uniform
+        # else:
+        #     pres_1_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] == 1)[0]])[:,1]
+        #     if np.var(pres_1_sim_rt) == 0 or pres_1_sim_rt.size == 1:
+        #         pres_1_sim_rt = np.append(pres_1_sim_rt, pres_1_sim_rt[0] + perturb)
+        #     pres_1_sim_rt_dist = gaussian_kde(pres_1_sim_rt, bw_method=0.1)
+        #
+        # # Simulated model distribution for resp = 1, C = 0
+        # if np.all(abs_sim_rt[:, 0] == 0):
+        #     # filler distribution as frac_pres_cor will eval to 0
+        #     abs_1_sim_rt_dist = uniform
+        # else:
+        #     abs_1_sim_rt = np.array(abs_sim_rt[np.where(abs_sim_rt[:,0] != 0)[0]])[:,1]
+        #     if np.var(pres_1_sim_rt) == 0 or pres_1_sim_rt.size == 1:
+        #         abs_1_sim_rt = np.append(abs_1_sim_rt, abs_1_sim_rt[0] + perturb)
+        #     abs_1_sim_rt_dist = gaussian_kde(abs_1_sim_rt, bw_method=0.1)
+        #
+        # # Simulated model distribution for resp = 0, C = 1
+        # if np.all(pres_sim_rt[:, 0] == 1):
+        #     # filler distribution as frac_pres_inc will eval to 0
+        #     pres_0_sim_rt_dist = uniform
+        # else:
+        #     pres_0_sim_rt = np.array(pres_sim_rt[np.where(pres_sim_rt[:,0] != 1)[0]])[:,1]
+        #     if np.var(pres_0_sim_rt) == 0 or pres_0_sim_rt.size == 1:
+        #         pres_0_sim_rt = np.append(pres_0_sim_rt, pres_0_sim_rt[0] + perturb)
+        #     pres_0_sim_rt_dist = gaussian_kde(pres_0_sim_rt, bw_method=0.1)
+
+            # def anim_update(i):
+            #     ax.azim = (i / 540) * 360
+            #     plt.draw()
+            #     return
+            #
+            # Writer = writers['ffmpeg']
+            # writer = Writer(fps=60, bitrate=1800)
+            # anim = FuncAnimation(fig, anim_update, frames=360)
+            # anim.save(savepath + '/subject_{}_bayes_opt_testpoints.mp4'.format(subject_num), writer=writer)
