@@ -30,7 +30,6 @@ d_map_samples = int(1e5)
 dt = 0.05
 N_array = [8, 12, 16]
 lapse = 1e-6
-k = 3
 
 try:
     subject_num = sys.argv[1]
@@ -319,6 +318,7 @@ def get_kde_dist(sim_rt, plot = False):
     # 2x2 matrix of distributions, i (row) is the underlying condition C
     # and j (column) is the response
     dist = []
+    sorted_rts = []
     perturb = norm.rvs(0, 0.01)
     for i in range(2):
         cur_rt = sim_rt[i]
@@ -326,22 +326,25 @@ def get_kde_dist(sim_rt, plot = False):
             if not np.any(cur_rt[:,0] == j):
                 # case where there are none of the responses given in the model simulation
                 dist.append(uniform)
+                sorted_rts.append([])
             else:
-                i_j_sim_rt = np.array(cur_rt[np.where(cur_rt[:,0] == j)[0]])[:,1]
+                i_j_sim_rt_marked = np.array(cur_rt[np.where(cur_rt[:,0] == j)[0]])
+                i_j_sim_rt = i_j_sim_rt_marked[:,1]
                 # if they are all the same or of size 1, perturb to allow kde
                 if np.var(i_j_sim_rt) == 0 or i_j_sim_rt.size == 1:
                 # if they are all the same, perturb to allow kde
                     i_j_sim_rt = np.append(i_j_sim_rt, i_j_sim_rt[0] + perturb)
-                if plot:
+                if plot and i==j:
                     if i == 0:
                         sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'purple',
                                     label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
                     else:
                         sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'yellow',
                                     label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
-
+                sorted_rts.append( [i_j_sim_rt_marked] )
                 dist.append(gaussian_kde(i_j_sim_rt, bw_method=0.1))
-    return np.reshape(dist, (2,2))
+
+    return np.reshape(dist, (2,2)), np.reshape(sorted_rts, (2,2))
 
 def get_single_N_likelihood(data, dist_matrix, reward):
 
