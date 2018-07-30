@@ -335,7 +335,7 @@ def get_kde_dist(sim_rt, plot = False):
                 # if they are all the same, perturb to allow kde
                     i_j_sim_rt = np.append(i_j_sim_rt, i_j_sim_rt[0] + perturb)
                 if plot:
-                    if i == 0:
+                    if i == 0 and i == j:
                         sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'purple',
                                     label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
                     else:
@@ -352,13 +352,13 @@ def get_single_N_likelihood(data, dist_matrix, sorted_rt, reward):
     frac_abs_0 = len(sorted_rt[0,0])
 
     pres_1_sim_rt_dist = dist_matrix[1,1]
-    frac_pres_1 = len(sorted_rt[0,0])
+    frac_pres_1 = len(sorted_rt[1,1])
 
     abs_1_sim_rt_dist = dist_matrix[0, 1]
-    frac_abs_1 = len(sorted_rt[0,0])
+    frac_abs_1 = len(sorted_rt[0,1])
 
     pres_0_sim_rt_dist = dist_matrix[1, 0]
-    frac_pres_0 = len(sorted_rt[0,0])
+    frac_pres_0 = len(sorted_rt[1,0])
 
     total_pres = frac_pres_0 + frac_pres_1
     total_abs = frac_abs_0 + frac_abs_1
@@ -409,13 +409,15 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
         decisions = back_induct(reward, punishment, rho, sigma, mu,
                                                 probs, reward_scheme)[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        dist_matrix = get_kde_dist(sim_rt)
-        likelihood += get_single_N_likelihood(data[i], dist_matrix, reward)
+        dist_matrix = get_kde_dist(sim_rt)[0]
+        sorted_rt = get_kde_dist(sim_rt)[1]
+        likelihood += get_single_N_likelihood(data[i], dist_matrix, sorted_rt, reward)
 
     return likelihood
 
 if __name__ == '__main__':
-    model_type = ('sig_punish', 'epsilon_punish', 'sqrt')
+
+    model_type = ('sig_punish', 'epsilon_punish', 'const')
     iter_bayesian_opt = 15
     '''model type is formated as tuple with first argument denoting parameters to fits;
         options are:
