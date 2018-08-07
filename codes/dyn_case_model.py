@@ -34,8 +34,14 @@ print('Subject number {}'.format(subject_num))
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
 
-temp = np.mean(np.array(exp1['rt']))
-sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
+test_data = pd.read_csv(r"C:\Users\Alex\Documents\synth0_7.csv", index_col = None)
+test_data.rename(columns={'sub': 'subno'}, inplace=True)
+
+sub_data = test_data.query('subno == {} & dyn == \'Dynamic\''.format(666))
+#sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
+
+temp = np.mean(np.array(sub_data['rt']))
+
 
 
 # GLOBAL CONSTANTS
@@ -253,10 +259,9 @@ def simulate_observer(arglist):
     D_trajectory = np.zeros(int(T / dt))
 
     while t < T:
-        if C == 1:
-            D_t = norm.rvs(t * mu[C], t * sigma[C]) * dt
-        if C == 0:
-            D_t = norm.rvs(t * mu[C], t * sigma[C]) * dt
+        D_t = D_t + norm.rvs(mu[C]*dt, sigma[C]*dt)
+
+        #D_t = norm.rvs(D_t + mu[C], sigma[C]) * dt
 
         g_t = D_to_g(D_t)
         D_trajectory[int(t / dt)] = D_t
@@ -264,10 +269,10 @@ def simulate_observer(arglist):
         t += dt
 
         if g_t < abs_bound:
-            return (0, t, g_trajectory, D_trajectory)
+            return (0, t + 0.1, g_trajectory, D_trajectory)
 
         if g_t > pres_bound:
-            return (1, t, g_trajectory, D_trajectory)
+            return (1, t + 0.1, g_trajectory, D_trajectory)
 
     return (np.NaN, T, g_trajectory, D_trajectory)
 
@@ -291,7 +296,7 @@ def get_rt(sigma, mu, decisions, numsims=5000, parallelize=False):
     return (abs_info, pres_info)
 
 
-def get_kde_dist(sim_rt, plot=False):
+def get_kde_dist(sim_rt, plot = False, ax = None):
     # 2x2 matrix of distributions, i (row) is the underlying condition C
     # and j (column) is the response
     dist = []
@@ -300,47 +305,85 @@ def get_kde_dist(sim_rt, plot=False):
     for i in range(2):
         cur_rt = sim_rt[i]
         for j in range(2):
-            if not np.any(cur_rt[:, 0] == j):
+            if not np.any(cur_rt[:,0] == j):
                 # case where there are none of the responses given in the model simulation
                 dist.append(uniform)
                 sorted_rts.append([])
             else:
-                i_j_sim_rt_marked = np.array(
-                    cur_rt[np.where(cur_rt[:, 0] == j)[0]])
-                i_j_sim_rt = i_j_sim_rt_marked[:, 1]
+                i_j_sim_rt_marked = np.array(cur_rt[np.where(cur_rt[:,0] == j)[0]])
+                i_j_sim_rt = i_j_sim_rt_marked[:,1]
                 # if they are all the same or of size 1, perturb to allow kde
                 if np.var(i_j_sim_rt) == 0 or i_j_sim_rt.size == 1:
-                    # if they are all the same, perturb to allow kde
+                # if they are all the same, perturb to allow kde
                     i_j_sim_rt = np.append(i_j_sim_rt, i_j_sim_rt[0] + perturb)
                 if plot and i == j:
                     if i == 0:
-                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color='purple',
-                                    label='Sim: con. = {0}, resp. = {1}'.format(i, j))
+                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'purple',
+                                    label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
                     else:
-                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color='yellow',
-                                    label='Sim: con. = {0}, resp. = {1}'.format(i, j))
-                sorted_rts.append([i_j_sim_rt_marked])
+                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'yellow',
+                                    label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
+                sorted_rts.append( [i_j_sim_rt] )
                 dist.append(gaussian_kde(i_j_sim_rt, bw_method=0.1))
 
-    return np.reshape(dist, (2, 2)), np.reshape(sorted_rts, (2, 2))
+    return np.reshape(dist, (2,2)), np.reshape(sorted_rts, (2,2))
 
+
+def plot_sig_trends(begin, end, num):
+    if num == 1:
+        raise Exception("num must be greater than 1")
+    model_type = ('sig', 'sym', 'const')
+    sig_points = np.linspace(begin, end, num)
+    reward = 1
+    punishment = 0
+
+    data_array = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
+            sub_data.query('setsize == 16')]
+
+
+    fig, axes = plt.subplots(num, 3, sharex=True, sharey = True, figsize=(10, 8.5), squeeze = True)
+    for i, sig in enumerate(sig_points):
+
+        stats = FineGrained(sig, 'const', d_map_samples).coarse_stats
+        for j in range(stats.shape[0]):
+            mu = stats[j, :, 0]
+            sigma = stats[j, :, 1]
+            prob_grid = trans_probs(sigma, mu)
+            rho = solve_rho(reward, punishment, model_type[1], sigma, mu, prob_grid)
+            decisions = back_induct(reward, punishment, rho, sigma, mu, prob_grid, model_type[1])[1]
+            sim_rt = get_rt(sigma, mu, decisions)
+
+            ax = axes[i, j]
+            ax.set_title('N = {}, sigma = {}'.format(N_array[j], np.round(sig, 3)))
+            currdata = data_array[0]
+            pres_rts_1 = currdata.query('resp == 1 & target == \'Present\'').rt.values
+            abs_rts_0 = currdata.query('resp == 2 & target == \'Absent\'').rt.values
+
+            sns.kdeplot(abs_rts_0, bw=0.1, shade=True, color='darkblue', ax=ax)
+            sns.kdeplot(pres_rts_1, bw=0.1, shade=True, color='red', ax=ax)
+
+            get_kde_dist(sim_rt, plot = True, ax = ax)
+
+        if i == num-1:
+            ax.set_xlabel('RT (s)')
+            ax.set_xlim([0, 11])
 
 def get_single_N_likelihood(data, dist_matrix, sorted_rt, reward):
 
     abs_0_sim_rt_dist = dist_matrix[0, 0]
-    frac_abs_0 = len(sorted_rt[0, 0])
+    num_abs_0 = len(sorted_rt[0, 0])
 
     pres_1_sim_rt_dist = dist_matrix[1, 1]
-    frac_pres_1 = len(sorted_rt[1, 1])
+    num_pres_1 = len(sorted_rt[1, 1])
 
     abs_1_sim_rt_dist = dist_matrix[0, 1]
-    frac_abs_1 = len(sorted_rt[0, 1])
+    num_abs_1 = len(sorted_rt[0, 1])
 
     pres_0_sim_rt_dist = dist_matrix[1, 0]
-    frac_pres_0 = len(sorted_rt[1, 0])
+    num_pres_0 = len(sorted_rt[1, 0])
 
-    total_pres = frac_pres_0 + frac_pres_1
-    total_abs = frac_abs_0 + frac_abs_1
+    total_pres = num_pres_0 + num_pres_1
+    total_abs = num_abs_0 + num_abs_1
 
     pres_rts_0 = data.query('resp == 2 & target == \'Present\'').rt.values
     pres_rts_1 = data.query('resp == 1 & target == \'Present\'').rt.values
@@ -350,16 +393,16 @@ def get_single_N_likelihood(data, dist_matrix, sorted_rt, reward):
 
     # frac_pres_inc = len(pres_rts_0) / (len(pres_rts_0) + len(pres_rts_1))
     # frac_pres_corr = len(pres_rts_1) / (len(pres_rts_0) + len(pres_rts_1))
-    log_like_pres = np.concatenate((np.log(frac_pres_0 / total_pres) +
+    log_like_pres = np.concatenate((np.log(num_pres_0 / total_pres) +
                                     np.log(pres_0_sim_rt_dist.pdf(pres_rts_0)),
-                                    np.log(frac_pres_1 / total_pres) +
+                                    np.log(num_pres_1 / total_pres) +
                                     np.log(pres_1_sim_rt_dist.pdf(pres_rts_1))))
 
     # frac_abs_inc = len(abs_rts_1) / (len(abs_rts_0) + len(abs_rts_1))
     # frac_abs_corr = len(abs_rts_0) / (len(abs_rts_0) + len(abs_rts_1))
-    log_like_abs = np.concatenate((np.log(frac_abs_0 / total_abs) +
+    log_like_abs = np.concatenate((np.log(num_abs_0 / total_abs) +
                                    np.log(abs_0_sim_rt_dist.pdf(abs_rts_0)),
-                                   np.log(frac_abs_1 / total_abs) +
+                                   np.log(num_abs_1 / total_abs) +
                                    np.log(abs_1_sim_rt_dist.pdf(abs_rts_1))))
 
     log_like_all = np.concatenate((log_like_pres, log_like_abs))
@@ -367,7 +410,6 @@ def get_single_N_likelihood(data, dist_matrix, sorted_rt, reward):
     likelihood_pertrial = (1 - lapse) * np.exp(log_like_all) + \
         (lapse / 2) * np.exp(-reward / temp)
     return -np.sum(np.log(likelihood_pertrial))
-
 
 def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
                         reward_scheme, fine_model_type):
@@ -379,7 +421,7 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
 
-    stats = FineGrained(fine_sigma, model_type, d_map_samples).coarse_stats
+    stats = FineGrained(fine_sigma, fine_model_type, d_map_samples).coarse_stats
 
     for i in range(stats.shape[0]):
         mu = stats[i, :, 0]
@@ -389,14 +431,15 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
         decisions = back_induct(reward, punishment, rho, sigma, mu,
                                 probs, reward_scheme)[1]
         sim_rt = get_rt(sigma, mu, decisions)
-        dist_matrix = get_kde_dist(sim_rt)
-        likelihood += get_single_N_likelihood(data[i], dist_matrix, reward)
+        dist_matrix = get_kde_dist(sim_rt)[0]
+        sorted_rt = get_kde_dist(sim_rt)[1]
+        likelihood += get_single_N_likelihood(data[i], dist_matrix, sorted_rt, reward)
 
     return likelihood
 
 
 if __name__ == '__main__':
-    model_type = ('sig_punish', 'epsilon_punish', 'sqrt')
+    model_type = ('sig', 'sym', 'const')
     iter_bayesian_opt = 15
     '''model type is formated as tuple with first argument denoting parameters to fits;
         options are:
@@ -480,11 +523,15 @@ if __name__ == '__main__':
         ax.set_ylabel('$log(punishment)$')
         ax.set_zlabel('$log(likelihood)$')
 
-    # # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
-    fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
 
+
+    best_likelihood = np.amin(yp)
     best_params = xp[np.argmin(yp)]
     best_sigma = np.exp(best_params[0])
+
+    # # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
+    fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
+    plt.figtext(0.67, 0.67, "-log likelihood = {}".format(np.round(best_likelihood, 3)))
 
     if model_type[0] == 'sig':
         reward = 1
@@ -515,7 +562,7 @@ if __name__ == '__main__':
     for n_con in it.product(N_array, display_con):
         all_rt[n_con] = []
 
-    stats = FineGrained(best_sigma, d_map_samples, model_type[2]).coarse_stats
+    stats = FineGrained(best_sigma, model_type[2], d_map_samples).coarse_stats
 
     for i in range(stats.shape[0]):
         mu = stats[i, :, 0]
@@ -552,7 +599,7 @@ if __name__ == '__main__':
         sns.kdeplot(pres_rts_1, bw=0.1, shade=True, label='Data: con. = 1, resp. = 1',
                     color='red', ax=ax)
 
-        get_kde_dist(sim_rt, plot=True)
+        get_kde_dist(sim_rt, plot=True, ax = ax)
 
         ax.set_ylabel('Density estimate')
         ax.legend()

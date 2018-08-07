@@ -7,7 +7,7 @@ class DataGen:
     def __init__(self, fine_sigma, reward=None, punishment=None, reward_scheme='sym',
                  model_type='const'):
 
-        self.d_map_samples = int(100000)
+        self.d_map_samples = int(10000)
         self.numsims = 5000
         # Set default reward and punishment if none passed
         if not reward and not punishment:
@@ -26,7 +26,7 @@ class DataGen:
             rho = dcn.solve_rho(reward, punishment, reward_scheme, sigma, mu, probs)
             decisions = dcn.back_induct(reward, punishment, rho, sigma, mu, probs, reward_scheme)[1]
             self.synth_rts.append(dcn.get_rt(sigma, mu, decisions, numsims=self.numsims,
-                                             parallelize=True))
+                                             parallelize=False))
 
     def save_csv(self, savepath):
         with open(savepath, 'w') as fw:
