@@ -58,7 +58,7 @@ class OptDDM:
 
         self.rho = rho_vec
 
-    def get_bounds():
+    def get_bounds(self):
         for i in range(self.stats.shape[0]):
             decisions = decision_vec[i]
             plt.figure()
@@ -66,7 +66,7 @@ class OptDDM:
             plt.imshow(decisions)
             plt.show()
 
-    def get_trans_probs():
+    def get_trans_probs(self):
         for i in range(self.stats.shape[0]):
             probs = trans_vec[i]
             plt.figure()

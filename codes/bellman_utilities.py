@@ -1,5 +1,5 @@
 from scipy.optimize import brentq
-from scipy import norm
+from scipy.stats import norm
 import numpy as np
 
 
@@ -7,7 +7,7 @@ class BellmanUtil:
     def __init__(self, T, t_w, size, d_t):
         self.T = T
         self.t_w = t_w
-        self.self.size = self.size
+        self.size = size
         self.dt = d_t
         self.g_values = np.linspace(1e-4, 1 - 1e-4, self.size)
         self.N_array = np.array([8, 12, 16])
@@ -38,7 +38,7 @@ class BellmanUtil:
 
     def trans_probs(self, sigma, mu, space='g'):
         if space == 'g':
-            dg = self.self.g_values[1] - self.g_values[0]
+            dg = self.g_values[1] - self.g_values[0]
             prob_grid = np.zeros((self.size, self.size))
             for i, g_t in enumerate(self.g_values):
                 updates = self.p_gtp1_gt(g_t, self.g_values, sigma, mu)
@@ -46,7 +46,7 @@ class BellmanUtil:
                 prob_grid[i, :] = updates
 
         if space == 'D':
-            D_values = np.linspace(0, 1e2, 1e3)
+            D_values = np.linspace(0, 100, 1000)
             dD = D_values[1] - D_values[0]
             prob_grid = np.zeros((len(D_values), len(D_values)))
             for i, D_t in enumerate(D_values):
@@ -56,8 +56,8 @@ class BellmanUtil:
 
         return prob_grid
 
-
-    def back_induct(self, reward, punishment, rho, sigma, mu, prob_grid, reward_scheme, t_dependent=False):
+    def back_induct(self, reward, punishment, rho, sigma, mu, prob_grid, reward_scheme,
+                    t_dependent=False):
         dg = self.g_values[1] - self.g_values[0]
 
         # Define the reward array
@@ -79,7 +79,7 @@ class BellmanUtil:
         decision_vals[:, 1] = self.g_values * R[1, 1] + \
             (1 - self.g_values) * R[1, 0] - (self.t_w * rho)  # resp pres
         decision_vals[:, 0] = (1 - self.g_values) * R[0, 0] + \
-            self.g_values * R[0, 1] - (self.back_induct_w * rho)  # resp abs
+            self.g_values * R[0, 1] - (self.t_w * rho)  # resp abs
 
         # Create array to store V for each g_t at each t. N x (T / dt)
         V_full = np.zeros((self.size, int(self.T / self.dt)))
@@ -94,7 +94,7 @@ class BellmanUtil:
             for i in range(self.size):
                 V_wait = np.sum(
                     prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * self.dt)
-                # Find the maximum value b/w waiting and two decision options. Store value and identity.
+                # Find the maximum value b/w waiting and two decision options. Store value and ident
                 V_full[i, -index] = np.amax((V_wait,
                                              decision_vals[i, 0], decision_vals[i, 1]))
                 decisions[i, -index] = np.argmax((V_wait,
@@ -118,7 +118,6 @@ class BellmanUtil:
                     break
         return V_full, decisions
 
-
     def solve_rho(self, reward, punishment, reward_scheme, sigma, mu, prob_grid):
         '''
         Root finding procedure to find rho given the constrain V(t=0)=0.
@@ -128,7 +127,7 @@ class BellmanUtil:
         def V_in_rho(log_rho):
             rho = np.exp(log_rho)
             values = self.back_induct(reward, punishment, rho, sigma, mu,
-                                 prob_grid, reward_scheme)[0]
+                                      prob_grid, reward_scheme)[0]
             return values[int(self.size / 2), 0]
 
         # when optimizing for reward this optimization should be accounted for in choosing bounds

@@ -1,8 +1,9 @@
 from scipy.stats import norm
 import numpy as np
 
+
 class FineGrained:
-    def __init__(self, fine_sigma, model, num_samples):
+    def __init__(self, fine_sigma, model, num_samples, N_array):
         ''' Instance containing necessary methods and functions to sample decision n_variables
         d from the fine-grained model of search.
             options for model are:
