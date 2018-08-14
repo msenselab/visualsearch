@@ -34,11 +34,11 @@ print('Subject number {}'.format(subject_num))
 exp1 = pd.read_csv(datapath, index_col=None)  # read data
 exp1.rename(columns={'sub': 'subno'}, inplace=True)
 
-test_data = pd.read_csv(r"C:\Users\Alex\Documents\synth0_7.csv", index_col = None)
-test_data.rename(columns={'sub': 'subno'}, inplace=True)
+# test_data = pd.read_csv(r"C:\Users\Alex\Documents\synth0_7.csv", index_col = None)
+# test_data.rename(columns={'sub': 'subno'}, inplace=True)
 
-sub_data = test_data.query('subno == {} & dyn == \'Dynamic\''.format(666))
-#sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
+# sub_data = test_data.query('subno == {} & dyn == \'Dynamic\''.format(666))
+sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
 
 temp = np.mean(np.array(sub_data['rt']))
 
