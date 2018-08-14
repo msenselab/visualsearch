@@ -440,7 +440,7 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
 
 if __name__ == '__main__':
     model_type = ('sig', 'sym', 'const')
-    iter_bayesian_opt = 15
+    iter_bayesian_opt = 200
     '''model type is formated as tuple with first argument denoting parameters to fits;
         options are:
             sig; fits just a fine grained sigma
@@ -611,7 +611,7 @@ if __name__ == '__main__':
     plt.savefig(
         savepath + '/subject_{}_bayes_opt_bestfits.png'.format(subject_num))
 
-    fw = open(savepath + '/subject_{}_simrt_and_params.p', 'wb')
+    fw = open(savepath + '/subject_{}_simrt_and_params.p'.format(subject_num), 'wb')
     outdict = {'best_sigma': best_params[0], 'best_reward': best_params[1], 'sim_rts': all_rt,
                'coarse_stats': stats}
     pickle.dump(outdict, fw)
