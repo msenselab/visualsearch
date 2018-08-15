@@ -43,7 +43,6 @@ sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
 temp = np.mean(np.array(sub_data['rt']))
 
 
-
 # GLOBAL CONSTANTS
 T = 10
 t_w = 0.5
@@ -259,7 +258,7 @@ def simulate_observer(arglist):
     D_trajectory = np.zeros(int(T / dt))
 
     while t < T:
-        D_t = D_t + norm.rvs(mu[C]*dt, sigma[C]*dt)
+        D_t = D_t + norm.rvs(mu[C] * dt, sigma[C] * dt)
 
         #D_t = norm.rvs(D_t + mu[C], sigma[C]) * dt
 
@@ -296,7 +295,7 @@ def get_rt(sigma, mu, decisions, numsims=5000, parallelize=False):
     return (abs_info, pres_info)
 
 
-def get_kde_dist(sim_rt, plot = False, ax = None):
+def get_kde_dist(sim_rt, plot=False, ax=None):
     # 2x2 matrix of distributions, i (row) is the underlying condition C
     # and j (column) is the response
     dist = []
@@ -305,28 +304,29 @@ def get_kde_dist(sim_rt, plot = False, ax = None):
     for i in range(2):
         cur_rt = sim_rt[i]
         for j in range(2):
-            if not np.any(cur_rt[:,0] == j):
+            if not np.any(cur_rt[:, 0] == j):
                 # case where there are none of the responses given in the model simulation
                 dist.append(uniform)
                 sorted_rts.append([])
             else:
-                i_j_sim_rt_marked = np.array(cur_rt[np.where(cur_rt[:,0] == j)[0]])
-                i_j_sim_rt = i_j_sim_rt_marked[:,1]
+                i_j_sim_rt_marked = np.array(
+                    cur_rt[np.where(cur_rt[:, 0] == j)[0]])
+                i_j_sim_rt = i_j_sim_rt_marked[:, 1]
                 # if they are all the same or of size 1, perturb to allow kde
                 if np.var(i_j_sim_rt) == 0 or i_j_sim_rt.size == 1:
-                # if they are all the same, perturb to allow kde
+                    # if they are all the same, perturb to allow kde
                     i_j_sim_rt = np.append(i_j_sim_rt, i_j_sim_rt[0] + perturb)
                 if plot and i == j:
                     if i == 0:
-                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'purple',
-                                    label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
+                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color='purple',
+                                    label='Sim: con. = {0}, resp. = {1}'.format(i, j), ax=ax)
                     else:
-                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'yellow',
-                                    label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
-                sorted_rts.append( [i_j_sim_rt] )
+                        sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color='yellow',
+                                    label='Sim: con. = {0}, resp. = {1}'.format(i, j), ax=ax)
+                sorted_rts.append([i_j_sim_rt])
                 dist.append(gaussian_kde(i_j_sim_rt, bw_method=0.1))
 
-    return np.reshape(dist, (2,2)), np.reshape(sorted_rts, (2,2))
+    return np.reshape(dist, (2, 2)), np.reshape(sorted_rts, (2, 2))
 
 
 def plot_sig_trends(begin, end, num):
@@ -338,10 +338,10 @@ def plot_sig_trends(begin, end, num):
     punishment = 0
 
     data_array = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
-            sub_data.query('setsize == 16')]
+                  sub_data.query('setsize == 16')]
 
-
-    fig, axes = plt.subplots(num, 3, sharex=True, sharey = True, figsize=(10, 8.5), squeeze = True)
+    fig, axes = plt.subplots(
+        num, 3, sharex=True, sharey=True, figsize=(10, 8.5), squeeze=True)
     for i, sig in enumerate(sig_points):
 
         stats = FineGrained(sig, 'const', d_map_samples).coarse_stats
@@ -349,24 +349,30 @@ def plot_sig_trends(begin, end, num):
             mu = stats[j, :, 0]
             sigma = stats[j, :, 1]
             prob_grid = trans_probs(sigma, mu)
-            rho = solve_rho(reward, punishment, model_type[1], sigma, mu, prob_grid)
-            decisions = back_induct(reward, punishment, rho, sigma, mu, prob_grid, model_type[1])[1]
+            rho = solve_rho(reward, punishment,
+                            model_type[1], sigma, mu, prob_grid)
+            decisions = back_induct(
+                reward, punishment, rho, sigma, mu, prob_grid, model_type[1])[1]
             sim_rt = get_rt(sigma, mu, decisions)
 
             ax = axes[i, j]
-            ax.set_title('N = {}, sigma = {}'.format(N_array[j], np.round(sig, 3)))
+            ax.set_title('N = {}, sigma = {}'.format(
+                N_array[j], np.round(sig, 3)))
             currdata = data_array[0]
-            pres_rts_1 = currdata.query('resp == 1 & target == \'Present\'').rt.values
-            abs_rts_0 = currdata.query('resp == 2 & target == \'Absent\'').rt.values
+            pres_rts_1 = currdata.query(
+                'resp == 1 & target == \'Present\'').rt.values
+            abs_rts_0 = currdata.query(
+                'resp == 2 & target == \'Absent\'').rt.values
 
             sns.kdeplot(abs_rts_0, bw=0.1, shade=True, color='darkblue', ax=ax)
             sns.kdeplot(pres_rts_1, bw=0.1, shade=True, color='red', ax=ax)
 
-            get_kde_dist(sim_rt, plot = True, ax = ax)
+            get_kde_dist(sim_rt, plot=True, ax=ax)
 
-        if i == num-1:
+        if i == num - 1:
             ax.set_xlabel('RT (s)')
             ax.set_xlim([0, 11])
+
 
 def get_single_N_likelihood(data, dist_matrix, sorted_rt, reward):
 
@@ -411,6 +417,7 @@ def get_single_N_likelihood(data, dist_matrix, sorted_rt, reward):
         (lapse / 2) * np.exp(-reward / temp)
     return -np.sum(np.log(likelihood_pertrial))
 
+
 def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
                         reward_scheme, fine_model_type):
     fine_sigma = np.exp(log_fine_sigma)
@@ -421,7 +428,8 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
     data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
             sub_data.query('setsize == 16')]
 
-    stats = FineGrained(fine_sigma, fine_model_type, d_map_samples).coarse_stats
+    stats = FineGrained(fine_sigma, fine_model_type,
+                        d_map_samples).coarse_stats
 
     for i in range(stats.shape[0]):
         mu = stats[i, :, 0]
@@ -433,7 +441,8 @@ def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
         sim_rt = get_rt(sigma, mu, decisions)
         dist_matrix = get_kde_dist(sim_rt)[0]
         sorted_rt = get_kde_dist(sim_rt)[1]
-        likelihood += get_single_N_likelihood(data[i], dist_matrix, sorted_rt, reward)
+        likelihood += get_single_N_likelihood(
+            data[i], dist_matrix, sorted_rt, reward)
 
     return likelihood
 
@@ -523,15 +532,14 @@ if __name__ == '__main__':
         ax.set_ylabel('$log(punishment)$')
         ax.set_zlabel('$log(likelihood)$')
 
-
-
     best_likelihood = np.amin(yp)
     best_params = xp[np.argmin(yp)]
     best_sigma = np.exp(best_params[0])
 
     # # Plot KDE of distributions for data and actual on optimal fit. First we need to simulate.
     fig, axes = plt.subplots(3, 1, sharex=True, figsize=(10, 8.5))
-    plt.figtext(0.67, 0.67, "-log likelihood = {}".format(np.round(best_likelihood, 3)))
+    plt.figtext(
+        0.67, 0.67, "-log likelihood = {}".format(np.round(best_likelihood, 3)))
 
     if model_type[0] == 'sig':
         reward = 1
@@ -599,7 +607,7 @@ if __name__ == '__main__':
         sns.kdeplot(pres_rts_1, bw=0.1, shade=True, label='Data: con. = 1, resp. = 1',
                     color='red', ax=ax)
 
-        get_kde_dist(sim_rt, plot=True, ax = ax)
+        get_kde_dist(sim_rt, plot=True, ax=ax)
 
         ax.set_ylabel('Density estimate')
         ax.legend()
