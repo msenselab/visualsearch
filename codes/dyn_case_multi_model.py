@@ -471,8 +471,8 @@ def plot_sig_trends(begin, end, num):
 
 if __name__ == '__main__':
 
-    model_type = ('sig', 'sym', 'const')
-    iter_bayesian_opt = 15
+    model_type = ('sig_reward', 'asym_reward', 'const')
+    iter_bayesian_opt = 50
     '''model type is formated as tuple with first argument denoting parameters to fits;
         options are:
             sig; fits just a fine grained sigma

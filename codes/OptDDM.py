@@ -4,23 +4,40 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde, norm, uniform
 import multiprocessing as mulpro
 import numpy as np
-from FineGrained import FineGrained
-from BellmanUtil import BellmanUtil
+from finegr_model import FineGrained
+from bellman_utilities import BellmanUtil
 
 
 class OptDDM:
     def __init__(self, params, model_type):
+        '''model type is formated as tuple with first argument denoting parameters to fits;
+            options are:
+                sig; fits just a fine grained sigma
+                sig_reward; fits fine grained sigma and reward per subject, punishment set to 0
+                sig_punish; fit fine grain sigma and punishment, reward set to 0
+        the second argument denoting the reward scheme used in backwards induction
+            options are:
+                sym; symetric reward matrix in reward and punishment
+                epsilon_punish; reward for correct fixed at 1 for both pres/abs correct response
+                asym_reward; reward for correct absent fixed at 1
+        and the third argument denoting the model used to bootstrap coarse_stats
+            options are:
+                const: constant mapping over all fine_sigma
+                'sqrt': sqrt scaling of N weighting of fine_sigma
+        sig_reward_sqrt; fits fine grained sigma and reward per subject with sqrt in d mapping
+        '''
         self.model_type = model_type
         self.params = params
 
-        # GLOBAL CONSTANTS
+        self.size = 100
         self.T = 10
         self.t_w = 0.5
-        self.size = 100
-        self.d_t = 0.05
+        self.dt = 0.05
         self.lapse = 1e-6
-        self.d_map_samples = int(1e5)
-        self.N_list = [8, 12, 16]
+        self.N_array = np.array([8, 12, 16])
+
+        self.bell_func = BellmanUtil(self.T, self.t_w, self.size, self.dt)
+        self.g_values = self.bell_func.g_values
 
         if model_type[0] == 'sig':
             fine_sigma = params[0]
@@ -37,49 +54,52 @@ class OptDDM:
         else:
             raise Exception("Invalid entry in first argument of model_type")
 
-        bell_func = BellmanUtil(self.T, self.t_w, self.size, self.d_t)
-        finemodel = FineGrained(fine_sigma, model_type[2], self.d_map_samples)
-        self.stats = finemodel.coarse_stats
+
+
+        #something buggy going on with the N array
+        self.finemodel = FineGrained(fine_sigma, model_type[2], int(1e5), np.array([8, 12, 16]))
+        self.stats = self.finemodel.coarse_stats
 
         self.rho_vec = np.zeros(self.stats.shape[0])
-        decision_vec = np.zeros(self.stats.shape[0])
-        trans_vec = np.zeros(self.stats.shape[0])
+        self.decision_vec = np.zeros((self.size, int(self.T/self.dt), self.stats.shape[0]))
+        self.trans_vec = np.zeros((self.size, self.size, self.stats.shape[0]))
         for i in range(self.stats.shape[0]):
             mu = self.stats[i, :, 0]
             sigma = self.stats[i, :, 1]
-            prob_grid = bell_func.trans_probs(sigma, mu)
-            trans_vec[i] = prob_grid
-            rho = bell_func.solve_rho(reward, punishment,
+            prob_grid = self.bell_func.trans_probs(sigma, mu)
+            self.trans_vec[:,:,i] = prob_grid
+            rho = self.bell_func.solve_rho(reward, punishment,
                             model_type[1], sigma, mu, prob_grid)
-            rho_vec[i] = rho
-            decisions = bell_func.back_induct(reward, punishment, rho,
+            self.rho_vec[i] = rho
+            self.decision_vec[:,:,i] = self.bell_func.back_induct(reward, punishment, rho,
                                     sigma, mu, prob_grid, model_type[1])[1]
-            decision_vec[i] = decisions
 
-        self.rho = rho_vec
 
-    def get_bounds(self):
+    def show_bounds(self):
         for i in range(self.stats.shape[0]):
-            decisions = decision_vec[i]
+            decision = self.decision_vec[:,:,i]
             plt.figure()
-            plt.title(str(N_array[i]))
-            plt.imshow(decisions)
-            plt.show()
+            plt.title('N = {}'.format(self.N_array[i]))
+            plt.imshow(decision)
 
-    def get_trans_probs(self):
+    def show_trans_probs(self):
         for i in range(self.stats.shape[0]):
-            probs = trans_vec[i]
+            probs = self.trans_vec[:,:,i]
             plt.figure()
-            plt.title(str(N_array[i]))
+            plt.title(str(self.N_array[i]))
             plt.imshow(probs)
-            plt.show()
 
-    def simulate_observer(N, condition):
-        N_index = N_list.index(N)
+    def simulate_observer(self, N, condition):
+        N_index = list(self.N_array).index(N)
+        dt = self.dt
+        T = self.T
+        g_values = self.g_values
         C = condition
-        decisions = decisions_vec[N_index]
-        mu = self.self.stats[N_index, :, 0]
-        sigma = self.self.stats[N_index, :, 1]
+        if C != 1 and C != 0:
+            raise Exception('condition must be 0 (abs) or 1 (pres)')
+        decisions = self.decision_vec[:,:,N_index]
+        mu = self.stats[N_index, :, 0]
+        sigma = self.stats[N_index, :, 1]
 
         dec_vec = decisions[:, 0]
         abs_bound = g_values[np.amax(np.where(dec_vec == 1)[0])]
@@ -88,13 +108,13 @@ class OptDDM:
         D_t = 0
         t = 0
 
-        g_trajectory = np.ones(int(T / self.dt)) * 0.5
-        D_trajectory = np.zeros(int(T / self.dt))
+        g_trajectory = np.ones(int(T / dt)) * 0.5
+        D_trajectory = np.zeros(int(T / dt))
 
-        while t < T:
-            D_t = D_t + norm.rvs(mu[C]*self.dt, sigma[C]*self.dt)
+        while t < T :
+            D_t = D_t + norm.rvs(mu[C]*dt, sigma[C]*dt)
 
-            g_t = D_to_g(D_t)
+            g_t = self.bell_func.D_to_g(D_t)
             D_trajectory[int(t / dt)] = D_t
             g_trajectory[int(t / dt)] = g_t
             t += dt
@@ -108,22 +128,24 @@ class OptDDM:
         return (np.NaN, T, g_trajectory, D_trajectory)
 
 
-    def get_rt(N, condition, numsims=5000, parallelize=False):
-        C_vals = [C] * numsims
-        arglists = it.product(C_vals, [decisions], [sigma], [mu], [dt])
+    def get_rt(self, N, condition, numsims=5000, parallelize=False):
+        C = condition
+        if C != 1 and C != 0:
+            raise Exception('condition must be 0 (abs) or 1 (pres)')
+
         if not parallelize:
             observer_outputs = []
-            for arglist in arglists:
-                observer_outputs.append(simulate_observer(arglist))
+            for i in range(numsims):
+                observer_outputs.append(self.simulate_observer(N, C))
         elif parallelize:
             cores = mulpro.cpu_count()
             pool = mulpro.Pool(processes=cores - 1)
-            observer_outputs = pool.map(simulate_observer, arglists)
+            observer_outputs = pool.map(self.simulate_observer, (N, condition))
         response_info = np.array([(x[0], x[1]) for x in observer_outputs])
         return response_info
 
 
-    def get_kde_dist(abs_rts, pres_rts, plot = False, ax = None):
+    def get_kde_dist(self, abs_rts, pres_rts, plot = False, ax = None):
         # 2x2 matrix of distributions, i (row) is the underlying condition C
         # and j (column) is the response
         dist = []
@@ -156,7 +178,7 @@ class OptDDM:
 
         return np.reshape(dist, (2,2)), np.reshape(sorted_rts, (2,2))
 
-    def get_single_N_likelihood(data, dist_matrix, sorted_rt, reward):
+    def get_single_N_likelihood(self, data, dist_matrix, sorted_rt, reward):
         temp = np.mean(np.array(data['rt']))
 
         abs_0_sim_rt_dist = dist_matrix[0, 0]
@@ -197,11 +219,11 @@ class OptDDM:
 
         log_like_all = np.concatenate((log_like_pres, log_like_abs))
 
-        likelihood_pertrial = (1 - lapse) * np.exp(log_like_all) + \
-            (lapse / 2) * np.exp(-reward / temp)
+        likelihood_pertrial = (1 - self.lapse) * np.exp(log_like_all) + \
+            (self.lapse / 2) * np.exp(-reward / temp)
         return -np.sum(np.log(likelihood_pertrial))
 
-    def get_data_likelihood(sub_data, log_reward, log_punishment, log_fine_sigma,
+    def get_data_likelihood(self, sub_data, log_reward, log_punishment, log_fine_sigma,
                             reward_scheme, fine_model_type):
         fine_sigma = np.exp(log_fine_sigma)
         reward = np.exp(log_reward)
@@ -211,18 +233,12 @@ class OptDDM:
         data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
                 sub_data.query('setsize == 16')]
 
-        self.stats = FineGrained(fine_sigma, fine_model_type, d_map_samples).coarse_stats
-
         for i in range(self.stats.shape[0]):
-            mu = self.stats[i, :, 0]
-            sigma = self.stats[i, :, 1]
-            probs = trans_probs(sigma, mu)
-            rho = solve_rho(reward, punishment, reward_scheme, sigma, mu, probs)
-            decisions = back_induct(reward, punishment, rho, sigma, mu,
-                                    probs, reward_scheme)[1]
-            sim_rt = get_rt(sigma, mu, decisions)
-            dist_matrix = get_kde_dist(sim_rt)[0]
-            sorted_rt = get_kde_dist(sim_rt)[1]
-            likelihood += get_single_N_likelihood(data[i], dist_matrix, sorted_rt, reward)
+            N = self.N_array[i]
+            abs_rt = self.get_rt(N, 0)
+            pres_rt = self.get_rt(N, 1)
+            dist_matrix = self.get_kde_dist(abs_rt, pres_rt)[0]
+            sorted_rt = self.get_kde_dist(abs_rt, pres_rt)[1]
+            likelihood += self.get_single_N_likelihood(data[i], dist_matrix, sorted_rt, reward)
 
         return likelihood

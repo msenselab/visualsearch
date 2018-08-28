@@ -3,15 +3,20 @@ import numpy as np
 
 
 class FineGrained:
-    def __init__(self, fine_sigma, model, num_samples, N_array):
+    def __init__(self, fine_sigma, model, num_samples):
         ''' Instance containing necessary methods and functions to sample decision n_variables
         d from the fine-grained model of search.
             options for model are:
             'const' : constant fine_sigma
             'sqrt'  : scale sigma by sqrt of N'''
+
+        if model != 'const' or model != 'sqrt':
+            raise Exception('Invalid entry for model type in fine grained model')
         self.fine_sigma = fine_sigma
         self.model = model
         self.num_samples = num_samples
+        N_array = np.array([8, 12, 16])
+
 
         N_min = np.amin(N_array)
         pres_samples = np.zeros((num_samples, N_array.shape[0]))
