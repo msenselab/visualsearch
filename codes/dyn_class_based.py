@@ -3,39 +3,50 @@ August 2018
 
 Class based implementation of the dynamic model
 '''
-
 import numpy as np
 from finegr_model import FineGrained
 from bellman_utilities import BellmanUtil
-from observer_sim import Observer
-
-fine_sigma = 0.6
-model = 'const'
-num_samples = int(1e5)
-N_array = np.array([8, 12, 16])
-reward = 1
-punishment = 0
-reward_scheme = 'sym'
+from fitter import Fitter
+import sys
+import pandas as pd
+from pathlib import Path
 
 T = 10
 dt = 0.05
 t_w = 0.5
 size = 100
-g_values = np.linspace(1e-4, 1 - 1e-4, size)
 lapse = 1e-6
+inits = (T, t_w, dt, size, lapse)
 
-finemodel = FineGrained(fine_sigma, model, num_samples, N_array)
-coarse_stats = finemodel.coarse_stats
+# Returns a path object that works as a string for most functions
+datapath = Path("../data/exp1.csv")
+savepath = Path("~/Documents/")  # Where to save figures
+savepath = str(savepath.expanduser())
 
-mu, sigma = coarse_stats[1, :, :]
+try:
+    subject_num = sys.argv[1]
+    if not subject_num.isnumeric():
+        subject_num = 1
+        print('Invalid subject number passed at prompt. Setting subject to 1')
+except ValueError:
+    subject_num = 1
+    print('No subject number passed at prompt. Setting subject to 1')
 
-bellman_eqs = BellmanUtil(T, t_w, size, dt)
-prob_grid = bellman_eqs.trans_probs(sigma, mu)
-rho = bellman_eqs.solve_rho(reward, punishment, reward_scheme, sigma, mu, prob_grid)
+print('Subject number {}'.format(subject_num))
 
-V_full, decisions = bellman_eqs.back_induct(reward, punishment, rho, sigma, mu, prob_grid,
-                                            reward_scheme)
+exp1 = pd.read_csv(datapath, index_col=None)  # read data
+exp1.rename(columns={'sub': 'subno'}, inplace=True)
 
-obs = Observer(T, dt, t_w, size, g_values, lapse)
-sim_rt = obs.get_rt(sigma, mu, decisions)
-dist_matrix, sorted_rt = obs.get_kde_dist(sim_rt)
+
+model_list = [
+            ('sig', 'sym', 'const'),
+        #    ('sig_reward', 'asym_reward', 'const'),
+        #    ('sig_punish', 'epsilon_punish', 'const'),
+        #    ('sig', 'sym', 'sqrt'),
+        #    ('sig_reward', 'asym_reward', 'sqrt'),
+        #    ('sig_punish', 'epsilon_punish', 'sqrt')
+                ]
+
+model_dict = {}
+for model_type in model_list:
+    model_dict[model_type] = Fitter(exp1, 1, model_type, 3, inits)

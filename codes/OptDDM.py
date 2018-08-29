@@ -1,4 +1,3 @@
-import itertools as it
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde, norm, uniform
@@ -9,7 +8,7 @@ from bellman_utilities import BellmanUtil
 
 
 class OptDDM:
-    def __init__(self, params, model_type):
+    def __init__(self, log_params, model_type, inits):
         '''model type is formated as tuple with first argument denoting parameters to fits;
             options are:
                 sig; fits just a fine grained sigma
@@ -25,39 +24,36 @@ class OptDDM:
                 const: constant mapping over all fine_sigma
                 'sqrt': sqrt scaling of N weighting of fine_sigma
         sig_reward_sqrt; fits fine grained sigma and reward per subject with sqrt in d mapping
+
+        inits is a tuple specifying (total time T, intertrival interval t_w, time step dt, size of grid, lapse rate)
         '''
         self.model_type = model_type
-        self.params = params
-
-        self.size = 100
-        self.T = 10
-        self.t_w = 0.5
-        self.dt = 0.05
-        self.lapse = 1e-6
+        self.params = log_params
+        self.T, self.t_w, self.dt, self.size, self.lapse = inits
         self.N_array = np.array([8, 12, 16])
 
         self.bell_func = BellmanUtil(self.T, self.t_w, self.size, self.dt)
         self.g_values = self.bell_func.g_values
 
         if model_type[0] == 'sig':
-            fine_sigma = params[0]
-            reward = 1
-            punishment = 0
+            self.fine_sigma = np.exp(log_params[0])
+            self.reward = 1
+            self.punishment = 0
         elif model_type[0] == 'sig_reward':
-            fine_sigma = params[0]
-            reward = params[1]
-            punishment = 0
+            self.fine_sigma = np.exp(log_params[0])
+            self.reward = np.exp(log_params[1])
+            self.punishment = 0
         elif model_type[0] == 'epsilon_punish':
-            fine_sigma = params[0]
-            reward = 1
-            punishment = params[1]
+            self.fine_sigma = np.exp(log_params[0])
+            self.reward = 1
+            self.punishment = np.exp(log_params[1])
         else:
             raise Exception("Invalid entry in first argument of model_type")
 
 
 
         #something buggy going on with the N array
-        self.finemodel = FineGrained(fine_sigma, model_type[2], int(1e5), np.array([8, 12, 16]))
+        self.finemodel = FineGrained(self.fine_sigma, model_type[2], int(1e5), np.array([8, 12, 16]))
         self.stats = self.finemodel.coarse_stats
 
         self.rho_vec = np.zeros(self.stats.shape[0])
@@ -68,10 +64,10 @@ class OptDDM:
             sigma = self.stats[i, :, 1]
             prob_grid = self.bell_func.trans_probs(sigma, mu)
             self.trans_vec[:,:,i] = prob_grid
-            rho = self.bell_func.solve_rho(reward, punishment,
+            rho = self.bell_func.solve_rho(self.reward, self.punishment,
                             model_type[1], sigma, mu, prob_grid)
             self.rho_vec[i] = rho
-            self.decision_vec[:,:,i] = self.bell_func.back_induct(reward, punishment, rho,
+            self.decision_vec[:,:,i] = self.bell_func.back_induct(self.reward, self.punishment, rho,
                                     sigma, mu, prob_grid, model_type[1])[1]
 
 
@@ -223,12 +219,8 @@ class OptDDM:
             (self.lapse / 2) * np.exp(-reward / temp)
         return -np.sum(np.log(likelihood_pertrial))
 
-    def get_data_likelihood(self, sub_data, log_reward, log_punishment, log_fine_sigma,
-                            reward_scheme, fine_model_type):
-        fine_sigma = np.exp(log_fine_sigma)
-        reward = np.exp(log_reward)
-        punishment = -np.exp(log_punishment)
-        print(fine_sigma, reward, punishment)
+    def get_data_likelihood(self, sub_data):
+        print(self.fine_sigma, self.reward, self.punishment)
         likelihood = 0
         data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
                 sub_data.query('setsize == 16')]
@@ -239,6 +231,6 @@ class OptDDM:
             pres_rt = self.get_rt(N, 1)
             dist_matrix = self.get_kde_dist(abs_rt, pres_rt)[0]
             sorted_rt = self.get_kde_dist(abs_rt, pres_rt)[1]
-            likelihood += self.get_single_N_likelihood(data[i], dist_matrix, sorted_rt, reward)
+            likelihood += self.get_single_N_likelihood(data[i], dist_matrix, sorted_rt, self.reward)
 
         return likelihood
