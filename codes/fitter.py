@@ -21,7 +21,7 @@ class Fitter:
 
         def subject_likelihood(params):
             ddm = OptDDM(params, self.model_type, inits)
-            return ddm.get_data_likelihood(self.data)
+            return ddm.get_data_likelihood(self.sub_data)
 
 
         if model_type[0] == 'sig':
@@ -91,8 +91,8 @@ class Fitter:
                                     + ', Reward Scheme: {},'.format(self.model_type[1]) \
                                     + ' Fine Model: {}'.format(self.model_type[2]))
 
-            data_array = [self.data.query('setsize == 8'), self.data.query('setsize == 12'),
-                    self.data.query('setsize == 16')]
+            data_array = [self.sub_data.query('setsize == 8'), self.sub_data.query('setsize == 12'),
+                    self.sub_data.query('setsize == 16')]
 
             for i in range(self.N_array.size):
                 N = self.N_array[i]

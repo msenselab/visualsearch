@@ -51,9 +51,7 @@ class OptDDM:
             raise Exception("Invalid entry in first argument of model_type")
 
 
-
-        #something buggy going on with the N array
-        self.finemodel = FineGrained(self.fine_sigma, model_type[2], int(1e5), np.array([8, 12, 16]))
+        self.finemodel = FineGrained(self.fine_sigma, model_type[2], int(1e5))
         self.stats = self.finemodel.coarse_stats
 
         self.rho_vec = np.zeros(self.stats.shape[0])

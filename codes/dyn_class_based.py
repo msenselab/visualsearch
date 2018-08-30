@@ -49,4 +49,5 @@ model_list = [
 
 model_dict = {}
 for model_type in model_list:
+    print(model_type)
     model_dict[model_type] = Fitter(exp1, 1, model_type, 3, inits)

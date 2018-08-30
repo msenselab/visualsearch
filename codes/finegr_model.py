@@ -10,7 +10,7 @@ class FineGrained:
             'const' : constant fine_sigma
             'sqrt'  : scale sigma by sqrt of N'''
 
-        if model != 'const' or model != 'sqrt':
+        if model != 'const' and model != 'sqrt':
             raise Exception('Invalid entry for model type in fine grained model')
         self.fine_sigma = fine_sigma
         self.model = model
