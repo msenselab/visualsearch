@@ -16,7 +16,6 @@ dt = 0.05
 t_w = 0.5
 size = 100
 lapse = 1e-6
-inits = (T, t_w, dt, size, lapse)
 
 # Returns a path object that works as a string for most functions
 datapath = Path("../data/exp1.csv")
@@ -39,15 +38,15 @@ exp1.rename(columns={'sub': 'subno'}, inplace=True)
 
 
 model_list = [
-            ('sig', 'sym', 'const'),
-        #    ('sig_reward', 'asym_reward', 'const'),
-        #    ('sig_punish', 'epsilon_punish', 'const'),
-        #    ('sig', 'sym', 'sqrt'),
-        #    ('sig_reward', 'asym_reward', 'sqrt'),
-        #    ('sig_punish', 'epsilon_punish', 'sqrt')
-                ]
+    ('sig', 'sym', 'const'),
+    #    ('sig_reward', 'asym_reward', 'const'),
+    #    ('sig_punish', 'epsilon_punish', 'const'),
+    #    ('sig', 'sym', 'sqrt'),
+    #    ('sig_reward', 'asym_reward', 'sqrt'),
+    #    ('sig_punish', 'epsilon_punish', 'sqrt')
+]
 
 model_dict = {}
 for model_type in model_list:
     print(model_type)
-    model_dict[model_type] = Fitter(exp1, 1, model_type, 3, inits)
+    model_dict[model_type] = Fitter(exp1, 1, model_type, 3, T, t_w, dt, size, lapse)

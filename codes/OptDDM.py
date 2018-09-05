@@ -1,15 +1,14 @@
-import seaborn as sns
-import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde, norm, uniform
-import multiprocessing as mulpro
 import numpy as np
 from finegr_model import FineGrained
 from bellman_utilities import BellmanUtil
 
 
 class OptDDM:
-    def __init__(self, log_params, model_type, inits):
-        '''model type is formated as tuple with first argument denoting parameters to fits;
+    def __init__(self, log_params, model_type, T, t_w, dt, size, lapse):
+        '''
+        log_params is either a float (fine sigma) or a 2x1 array with fine sigma and other param
+        model type is formated as tuple with first argument denoting parameters to fits;
             options are:
                 sig; fits just a fine grained sigma
                 sig_reward; fits fine grained sigma and reward per subject, punishment set to 0
@@ -25,18 +24,18 @@ class OptDDM:
                 'sqrt': sqrt scaling of N weighting of fine_sigma
         sig_reward_sqrt; fits fine grained sigma and reward per subject with sqrt in d mapping
 
-        inits is a tuple specifying (total time T, intertrival interval t_w, time step dt, size of grid, lapse rate)
+        inits is a tuple specifying (total time T, intertrival interval t_w, time step dt,
+                                     size of grid, lapse rate)
         '''
         self.model_type = model_type
-        self.params = log_params
-        self.T, self.t_w, self.dt, self.size, self.lapse = inits
+        self.T, self.t_w, self.dt, self.size, self.lapse = T, t_w, dt, size, lapse
         self.N_array = np.array([8, 12, 16])
 
         self.bell_func = BellmanUtil(self.T, self.t_w, self.size, self.dt)
         self.g_values = self.bell_func.g_values
 
         if model_type[0] == 'sig':
-            self.fine_sigma = np.exp(log_params[0])
+            self.fine_sigma = np.exp(log_params)
             self.reward = 1
             self.punishment = 0
         elif model_type[0] == 'sig_reward':
@@ -50,9 +49,7 @@ class OptDDM:
         else:
             raise Exception("Invalid entry in first argument of model_type")
 
-
-        self.finemodel = FineGrained(self.fine_sigma, model_type[2], int(1e5))
-        self.stats = self.finemodel.coarse_stats
+        self.stats = FineGrained(self.fine_sigma, model_type[2], int(1e5)).coarse_stats
 
         self.rho_vec = np.zeros(self.stats.shape[0])
         self.decision_vec = np.zeros((self.size, int(self.T/self.dt), self.stats.shape[0]))
@@ -61,27 +58,27 @@ class OptDDM:
             mu = self.stats[i, :, 0]
             sigma = self.stats[i, :, 1]
             prob_grid = self.bell_func.trans_probs(sigma, mu)
-            self.trans_vec[:,:,i] = prob_grid
+            self.trans_vec[:, :, i] = prob_grid
             rho = self.bell_func.solve_rho(self.reward, self.punishment,
-                            model_type[1], sigma, mu, prob_grid)
+                                           model_type[1], sigma, mu, prob_grid)
             self.rho_vec[i] = rho
-            self.decision_vec[:,:,i] = self.bell_func.back_induct(self.reward, self.punishment, rho,
-                                    sigma, mu, prob_grid, model_type[1])[1]
+            self.decision_vec[:, :, i] = self.bell_func.back_induct(self.reward, self.punishment,
+                                                                    rho, sigma, mu, prob_grid,
+                                                                    model_type[1])[1]
 
-
-    def show_bounds(self):
-        for i in range(self.stats.shape[0]):
-            decision = self.decision_vec[:,:,i]
-            plt.figure()
-            plt.title('N = {}'.format(self.N_array[i]))
-            plt.imshow(decision)
-
-    def show_trans_probs(self):
-        for i in range(self.stats.shape[0]):
-            probs = self.trans_vec[:,:,i]
-            plt.figure()
-            plt.title(str(self.N_array[i]))
-            plt.imshow(probs)
+    # def show_bounds(self):
+    #     for i in range(self.stats.shape[0]):
+    #         decision = self.decision_vec[:, :, i]
+    #         plt.figure()
+    #         plt.title('N = {}'.format(self.N_array[i]))
+    #         plt.imshow(decision)
+    #
+    # def show_trans_probs(self):
+    #     for i in range(self.stats.shape[0]):
+    #         probs = self.trans_vec[:, :, i]
+    #         plt.figure()
+    #         plt.title(str(self.N_array[i]))
+    #         plt.imshow(probs)
 
     def simulate_observer(self, N, condition):
         N_index = list(self.N_array).index(N)
@@ -91,7 +88,7 @@ class OptDDM:
         C = condition
         if C != 1 and C != 0:
             raise Exception('condition must be 0 (abs) or 1 (pres)')
-        decisions = self.decision_vec[:,:,N_index]
+        decisions = self.decision_vec[:, :, N_index]
         mu = self.stats[N_index, :, 0]
         sigma = self.stats[N_index, :, 1]
 
@@ -105,7 +102,7 @@ class OptDDM:
         g_trajectory = np.ones(int(T / dt)) * 0.5
         D_trajectory = np.zeros(int(T / dt))
 
-        while t < T :
+        while t < T:
             D_t = D_t + norm.rvs(mu[C]*dt, sigma[C]*dt)
 
             g_t = self.bell_func.D_to_g(D_t)
@@ -121,25 +118,18 @@ class OptDDM:
 
         return (np.NaN, T, g_trajectory, D_trajectory)
 
-
-    def get_rt(self, N, condition, numsims=5000, parallelize=False):
+    def get_rt(self, N, condition, numsims=5000):
         C = condition
         if C != 1 and C != 0:
             raise Exception('condition must be 0 (abs) or 1 (pres)')
 
-        if not parallelize:
-            observer_outputs = []
-            for i in range(numsims):
-                observer_outputs.append(self.simulate_observer(N, C))
-        elif parallelize:
-            cores = mulpro.cpu_count()
-            pool = mulpro.Pool(processes=cores - 1)
-            observer_outputs = pool.map(self.simulate_observer, (N, condition))
+        observer_outputs = []
+        for i in range(numsims):
+            observer_outputs.append(self.simulate_observer(N, C))
         response_info = np.array([(x[0], x[1]) for x in observer_outputs])
         return response_info
 
-
-    def get_kde_dist(self, abs_rts, pres_rts, plot = False, ax = None):
+    def get_kde_dist(self, abs_rts, pres_rts, plot=False, ax=None):
         # 2x2 matrix of distributions, i (row) is the underlying condition C
         # and j (column) is the response
         dist = []
@@ -149,28 +139,28 @@ class OptDDM:
         for i in range(2):
             cur_rt = sim_rt[i]
             for j in range(2):
-                if not np.any(cur_rt[:,0] == j):
+                if not np.any(cur_rt[:, 0] == j):
                     # case where there are none of the responses given in the model simulation
                     dist.append(uniform)
                     sorted_rts.append([])
                 else:
-                    i_j_sim_rt_marked = np.array(cur_rt[np.where(cur_rt[:,0] == j)[0]])
-                    i_j_sim_rt = i_j_sim_rt_marked[:,1]
+                    i_j_sim_rt_marked = np.array(cur_rt[np.where(cur_rt[:, 0] == j)[0]])
+                    i_j_sim_rt = i_j_sim_rt_marked[:, 1]
                     # if they are all the same or of size 1, perturb to allow kde
                     if np.var(i_j_sim_rt) == 0 or i_j_sim_rt.size == 1:
-                    # if they are all the same, perturb to allow kde
+                        # if they are all the same, perturb to allow kde
                         i_j_sim_rt = np.append(i_j_sim_rt, i_j_sim_rt[0] + perturb)
-                    if plot and i == j:
-                        if i == 0:
-                            sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'purple',
-                                        label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
-                        else:
-                            sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color = 'yellow',
-                                        label='Sim: con. = {0}, resp. = {1}'.format(i,j), ax=ax)
-                    sorted_rts.append( [i_j_sim_rt] )
+                    # if plot and i == j:
+                    #     if i == 0:
+                    #         sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color='purple',
+                    #                     label='Sim: con. = {0}, resp. = {1}'.format(i, j), ax=ax)
+                    #     else:
+                    #         sns.kdeplot(i_j_sim_rt, bw=0.1, shade=True, color='yellow',
+                    #                     label='Sim: con. = {0}, resp. = {1}'.format(i, j), ax=ax)
+                    sorted_rts.append([i_j_sim_rt])
                     dist.append(gaussian_kde(i_j_sim_rt, bw_method=0.1))
 
-        return np.reshape(dist, (2,2)), np.reshape(sorted_rts, (2,2))
+        return np.reshape(dist, (2, 2)), np.reshape(sorted_rts, (2, 2))
 
     def get_single_N_likelihood(self, data, dist_matrix, sorted_rt, reward):
         temp = np.mean(np.array(data['rt']))
@@ -195,7 +185,6 @@ class OptDDM:
 
         abs_rts_0 = data.query('resp == 2 & target == \'Absent\'').rt.values
         abs_rts_1 = data.query('resp == 1 & target == \'Absent\'').rt.values
-
 
         # frac_pres_inc = len(pres_rts_0) / (len(pres_rts_0) + len(pres_rts_1))
         # frac_pres_corr = len(pres_rts_1) / (len(pres_rts_0) + len(pres_rts_1))
