@@ -49,6 +49,7 @@ class OptDDM:
         else:
             raise Exception("Invalid entry in first argument of model_type")
 
+        print('finesig =', self.fine_sigma, 'reward =', self.reward, 'punish =', self.punishment)
         self.stats = FineGrained(self.fine_sigma, model_type[2], int(1e5)).coarse_stats
 
         self.rho_vec = np.zeros(self.stats.shape[0])
@@ -207,7 +208,6 @@ class OptDDM:
         return -np.sum(np.log(likelihood_pertrial))
 
     def get_data_likelihood(self, sub_data):
-        print(self.fine_sigma, self.reward, self.punishment)
         likelihood = 0
         data = [sub_data.query('setsize == 8'), sub_data.query('setsize == 12'),
                 sub_data.query('setsize == 16')]

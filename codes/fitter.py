@@ -1,4 +1,4 @@
-from optDDM import OptDDM
+from OptDDM import OptDDM
 from gauss_opt import bayesian_optimisation
 import numpy as np
 import itertools as it
