@@ -77,7 +77,7 @@ class DataLikelihoods:
 
         log_like_all = np.concatenate((log_like_pres, log_like_abs))
 
-        likelihood_pertrial = (1 - self.lapse) * np.exp(log_like_all) + \
-            (self.lapse / 2) * np.exp(-reward / temp)
+        likelihood_pertrial = (1 - lapse) * np.exp(log_like_all) + \
+            (lapse / 2) * np.exp(-reward / temp)
 
         self.likelihood += -np.sum(np.log(likelihood_pertrial))
