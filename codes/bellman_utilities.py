@@ -4,13 +4,47 @@ import numpy as np
 
 
 class BellmanUtil:
-    def __init__(self, T, t_w, size, d_t):
+    def __init__(self, T, dt, t_w, size, reward, punishment, sigma, mu,
+                 reward_scheme, **kwargs):
+        """
+        Solves for rho and performs backward induction through bellman eqs to find value over time
+
+        Parameters
+        ----------
+        T : Arbitrary choice of maximum time for a single trial
+        dt : Length of a single timestep
+        t_w : Inter-trial interval
+        size : Number of values of g to test within the grid
+        reward : Reward for a given correct response. Implementation depends on reward_scheme
+        punishment : Negative reward for incorr responses. Implementation depends on reward_scheme
+        sigma : Observation noise at current N
+        mu : Mean of observations at current N
+        reward_scheme : Layout of reward matrix. Options are
+            \'sym\' : Symmetric reward matrix. Diagonal (correct responses) have value = reward.
+                      Off-diagonals have value = punishment
+            \'epsilon_punish\' : Diagonal is 1. Off-diagonals have value = punishment
+            \'asym_reward\' : Correct response reward (i.e. R[1, 1]) is fixed at 1. Off-diagonals
+                              have value = punishment. Correct abs (i.e. R[0, 0]) has value = reward
+
+        Outputs
+        ----------
+        self.V_full : The full value matrix for the correct rho given parameters.
+                      Of shape size x (T / dt), where rows correspond to values of g
+        self.decisions : The matrix of decisions for a given g_t at a timestep t. Same shape as
+                         above. 0 indicates wait, 1 indicates decide absent, 2 indicates decide pres
+
+        """
         self.T = T
         self.t_w = t_w
         self.size = size
-        self.dt = d_t
+        self.dt = dt
         self.g_values = np.linspace(1e-4, 1 - 1e-4, self.size)
-        self.N_array = np.array([8, 12, 16])
+
+        prob_grid = self.trans_probs(sigma, mu)
+        self.rho = self.solve_rho(reward, punishment, reward_scheme, sigma, mu, prob_grid)
+
+        self.V_full, self.decisions = self.back_induct(reward, punishment, self.rho,
+                                                       sigma, mu, prob_grid, reward_scheme)
 
     def g_to_D(self, g_t):
         return np.log(g_t / (1 - g_t))
@@ -36,23 +70,13 @@ class BellmanUtil:
 
         return pres_draw + abs_draw
 
-    def trans_probs(self, sigma, mu, space='g'):
-        if space == 'g':
-            dg = self.g_values[1] - self.g_values[0]
-            prob_grid = np.zeros((self.size, self.size))
-            for i, g_t in enumerate(self.g_values):
-                updates = self.p_gtp1_gt(g_t, self.g_values, sigma, mu)
-                updates = updates / (np.sum(updates) * dg)
-                prob_grid[i, :] = updates
-
-        if space == 'D':
-            D_values = np.linspace(0, 100, 1000)
-            dD = D_values[1] - D_values[0]
-            prob_grid = np.zeros((len(D_values), len(D_values)))
-            for i, D_t in enumerate(D_values):
-                updates = self.p_Dtp1_Dt(D_t, D_values, sigma, mu)
-                updates = updates / (np.sum(updates) * dD)
-                prob_grid[i, :] = updates
+    def trans_probs(self, sigma, mu):
+        dg = self.g_values[1] - self.g_values[0]
+        prob_grid = np.zeros((self.size, self.size))
+        for i, g_t in enumerate(self.g_values):
+            updates = self.p_gtp1_gt(g_t, self.g_values, sigma, mu)
+            updates = updates / (np.sum(updates) * dg)
+            prob_grid[i, :] = updates
 
         return prob_grid
 
@@ -71,7 +95,7 @@ class BellmanUtil:
             R = np.array([(reward, punishment),
                           (punishment, 1)])
         else:
-            raise Exception('Entered invalid reward_scheme')
+            raise ValueError('Entered invalid reward_scheme')
         # Decision values are static for a given g_t and independent of t. We compute these
         # in advance
         # N x 2 matrix. First column is resp. abs, second is pres.
@@ -132,8 +156,7 @@ class BellmanUtil:
 
         # when optimizing for reward this optimization should be accounted for in choosing bounds
         try:
-            opt_log_rho = brentq(
-                V_in_rho, -10 + np.log(reward), 10 + np.log(reward))
+            opt_log_rho = brentq(V_in_rho, -10 + np.log(reward), 10 + np.log(reward))
         except ValueError:
             raise Exception("defective bounds in rho finding procedure")
 

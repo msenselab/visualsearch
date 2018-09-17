@@ -11,17 +11,6 @@ import sys
 import pandas as pd
 from pathlib import Path
 
-T = 10
-dt = 0.05
-t_w = 0.5
-size = 100
-lapse = 1e-6
-
-# Returns a path object that works as a string for most functions
-datapath = Path("../data/exp1.csv")
-savepath = Path("~/Documents/")  # Where to save figures
-savepath = str(savepath.expanduser())
-
 try:
     subject_num = sys.argv[1]
     if not subject_num.isnumeric():
@@ -30,6 +19,24 @@ try:
 except ValueError:
     subject_num = 1
     print('No subject number passed at prompt. Setting subject to 1')
+
+size = 100
+model_params = {'T': 10,
+                'd_t': 0.05,
+                'rho': 1,
+                't_w': 0.5,
+                'size': size,
+                'lapse': 1e-6,
+                'fine_model': 'const',
+                'reward_scheme': 'sym',
+                'N_values': np.array([8, 12, 16]),
+                'g_values': np.linspace(1e-4, 1 - 1e-4, size),
+                'subject_num': subject_num}
+
+# Returns a path object that works as a string for most functions
+datapath = Path("../data/exp1.csv")
+savepath = Path("~/Documents/")  # Where to save figures
+savepath = str(savepath.expanduser())
 
 print('Subject number {}'.format(subject_num))
 

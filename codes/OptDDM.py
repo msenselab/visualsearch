@@ -81,14 +81,13 @@ class OptDDM:
     #         plt.title(str(self.N_array[i]))
     #         plt.imshow(probs)
 
-    def simulate_observer(self, N, condition):
+    def simulate_observer(self, N, C):
         N_index = list(self.N_array).index(N)
         dt = self.dt
         T = self.T
         g_values = self.g_values
-        C = condition
         if C != 1 and C != 0:
-            raise Exception('condition must be 0 (abs) or 1 (pres)')
+            raise ValueError('condition C must be 0 (abs) or 1 (pres)')
         decisions = self.decision_vec[:, :, N_index]
         mu = self.stats[N_index, :, 0]
         sigma = self.stats[N_index, :, 1]
