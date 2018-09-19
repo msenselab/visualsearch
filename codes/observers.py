@@ -34,6 +34,7 @@ class ObserverSim:
                                                              sigma, decisions, C))
 
         response_info = np.array([(x[0], x[1]) for x in observer_responses])
+        self.numsims = numsims
         self.rt_abs = response_info[:numsims]
         self.rt_pres = response_info[numsims:]
         self.dist_matrix, self.rts_matrix = self.get_kde_dist()

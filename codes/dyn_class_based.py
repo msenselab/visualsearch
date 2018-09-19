@@ -20,7 +20,7 @@ from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 import pickle
 
-num_samples = 600
+num_samples = 950
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 
@@ -97,6 +97,7 @@ def modelfit(arglist):
     model_type, model_params = arglist
     model_params['fine_model'] = model_type[2]
     model_params['reward_scheme'] = model_type[1]
+    model_params['opt_type'] = model_type[0]
 
     def likelihood_for_opt(log_parameters):
         likelihood_arglist = model_type, log_parameters, model_params
@@ -105,16 +106,16 @@ def modelfit(arglist):
     if model_type[0] == 'sig':
         bnds = np.array(((-1.7, 1.),))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                      bounds=bnds, n_pre_samples=5)
+                                      bounds=bnds, n_pre_samples=50)
     if model_type[0] == 'sig_reward':
         bnds = np.array(((-1.7, 1.), (-1., 0.5)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                      bounds=bnds, n_pre_samples=15)
+                                      bounds=bnds, n_pre_samples=50)
 
     if model_type[0] == 'sig_punish':
         bnds = np.array(((-1.7, 1.), (-5., -0.5)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                      bounds=bnds, n_pre_samples=5)
+                                      bounds=bnds, n_pre_samples=50)
 
     model_params['tested_params'], model_params['likelihoods_returned'] = x_opt
     fw = open(savepath + '/subject_{}_{}_{}_{}_modelfit.p'.format(subject_num, *model_type), 'wb')
@@ -136,7 +137,6 @@ if __name__ == '__main__':
     size = 100
     model_params = {'T': 10,
                     'dt': 0.05,
-                    'rho': 1,
                     't_w': 0.5,
                     'size': size,
                     'lapse': 1e-6,
