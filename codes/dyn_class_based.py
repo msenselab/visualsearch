@@ -104,16 +104,16 @@ def modelfit(arglist):
         return subject_likelihood(likelihood_arglist)
 
     if model_type[0] == 'sig':
-        bnds = np.array(((-1.7, 1.),))  # [n_variables, 2] shaped array with bounds
+        bnds = np.array(((-1.7, 2.5),))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                       bounds=bnds, n_pre_samples=50)
     if model_type[0] == 'sig_reward':
-        bnds = np.array(((-1.7, 1.), (-1., 0.5)))  # [n_variables, 2] shaped array with bounds
+        bnds = np.array(((-1.7, 2.5), (-1., 0.5)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                       bounds=bnds, n_pre_samples=50)
 
     if model_type[0] == 'sig_punish':
-        bnds = np.array(((-1.7, 1.), (-5., -0.5)))  # [n_variables, 2] shaped array with bounds
+        bnds = np.array(((-1.7, 2.5), (-5., 1.)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                       bounds=bnds, n_pre_samples=50)
 

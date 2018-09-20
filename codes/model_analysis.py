@@ -2,6 +2,7 @@ import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.animation import FuncAnimation, writers
 import seaborn as sns
 from fine_grain_model import FineGrained
 from bellman_utilities import BellmanUtil
@@ -56,19 +57,20 @@ class OptAnalysis:
             elif self.opt_type == 'sig_punish':
                 ax.set_xlabel(r'$\sigma_{fine}$', size=20)
                 ax.set_ylabel('Punishment', size=20)
-            ax.set_zlabel('log(likelihood)')
+            ax.set_zlabel('log(likelihood)', size=20)
             ax.set_title("Subject {} {} optimization, {} fine model, {} reward scheme".format(
                          self.subject_num, self.opt_type, self.fine_model, self.reward_scheme))
         else:
-            fig = plt.figure()
+            fig = plt.figure(figsize=(10, 10))
             ax = fig.add_subplot(111)
             x = np.exp(self.tested_params)
             y = self.likelihoods_returned
-            ax.plot(x, y, c=y, cmap='viridis', size=20)
-            ax.set_xlabel(r'$\sigma_{fine}$')
-            ax.set_ylabel('log(likelihood)')
+            ax.scatter(x, y, c=y, cmap='viridis', s=12, edgecolor='none')
+            ax.set_xlabel(r'$\sigma_{fine}$', size=20)
+            ax.set_ylabel('log(likelihood)', size=20)
             ax.set_title("Subject {} {} optimization, {} fine model, {} reward scheme".format(
-                         self.subject_num, self.opt_type, self.fine_model, self.reward_scheme))
+                         self.subject_num, self.opt_type, self.fine_model, self.reward_scheme),
+                         size=24)
         return fig, ax
 
     def plot_opt_fits(self):
@@ -121,8 +123,42 @@ class OptAnalysis:
         axes[-1].set_xlabel('RT (s)')
         axes[-1].set_xlim([0, self.model_params['T']])
         fig.suptitle("Subject {} {} optimization, {} fine model, {} reward scheme".format(
-                     self.subject_num, self.opt_type, self.fine_model, self.reward_scheme))
+                     self.subject_num, self.opt_type, self.fine_model, self.reward_scheme), size=24)
         return fig, axes
+
+    def save_anim_likelihoods(self, savepath, numframes=420):
+        """ Assumes savepath is a Path object from pathlib, not a string """
+        if self.opt_type not in ('sig_reward', 'sig_punish'):
+            raise ValueError('Only two-parameter optimization data can be shown in 3D')
+        ffmpeg_writer = writers['ffmpeg']
+        curr_writer = ffmpeg_writer(fps=60, bitrate=5200)
+
+        fig = plt.figure(figsize=(10, 10))
+        ax = Axes3D(fig)
+        x, y = np.split(self.tested_params, 2, axis=1)
+        x = np.exp(x.reshape(-1))  # parameters are stored as log values. Get back orig via exp
+        y = np.exp(y.reshape(-1))
+        z = self.likelihoods_returned
+        ax.scatter(x, y, z, c=z, cmap='viridis', s=20, lw=0.2)
+        ax.plot_trisurf(x, y, z, cmap='viridis', edgecolor='none')
+        if self.opt_type == 'sig_reward':
+            ax.set_xlabel(r'$\sigma_{fine}$', size=20)
+            ax.set_ylabel('Reward', size=20)
+        elif self.opt_type == 'sig_punish':
+            ax.set_xlabel(r'$\sigma_{fine}$', size=20)
+            ax.set_ylabel('Punishment', size=20)
+        ax.set_zlabel('log(likelihood)', size=20)
+        ax.set_title("Subject {} {} optimization, {} fine model, {} reward scheme".format(
+                     self.subject_num, self.opt_type, self.fine_model, self.reward_scheme))
+
+        def anim_update(i):
+            ax.view_init(azim=(i / numframes) * 360)
+            plt.draw()
+            return
+
+        anim = FuncAnimation(fig, anim_update, frames=numframes)
+        anim.save(str(savepath.expanduser()), writer=curr_writer)
+        return
 
 
 if __name__ == '__main__':
@@ -141,5 +177,29 @@ if __name__ == '__main__':
         opt_type, reward_scheme, fine_model = model
         savepath = datapath.joinpath('./{}_{}_{}'.format(opt_type, reward_scheme, fine_model))
         for subject in subjects:
-            filename = 'subject_{}_{}_{}_{}_modelfit.p'.format(subject, opt_type,
-                                                               reward_scheme, fine_model)
+            filename = './subject_{}_{}_{}_{}_modelfit.p'.format(subject, opt_type,
+                                                                 reward_scheme, fine_model)
+            sub_fit = np.load(datapath.joinpath(filename).expanduser())
+            if 'opt_type' not in sub_fit:
+                sub_fit['opt_type'] = opt_type
+
+            curranalysis = OptAnalysis(**sub_fit)
+            # First plot tested likelihoods
+            if sub_fit['opt_type'] == 'sig':
+                fig, ax = curranalysis.plot_likelihoods()
+                figurepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.png'.format(
+                                               subject, opt_type, reward_scheme, fine_model))
+                plt.savefig(str(figurepath.expanduser()), DPI=500)
+                plt.close()
+            else:
+                moviepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.mp4'.format(
+                                              subject, opt_type, reward_scheme, fine_model))
+                curranalysis.save_anim_likelihoods(moviepath)
+                plt.close()
+
+            # Now plot distributions of best fit
+            distfigurepath = savepath.joinpath('subject_{}_{}_{}_{}_bestfit_dist.png'.format(
+                                               subject, opt_type, reward_scheme, fine_model))
+            fig, ax = curranalysis.plot_opt_fits()
+            plt.savefig(str(distfigurepath.expanduser()), DPI=500)
+            plt.close()
