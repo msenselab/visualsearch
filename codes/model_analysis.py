@@ -79,9 +79,11 @@ class OptAnalysis:
 
         if self.opt_type == 'sig':
             self.model_params['fine_sigma'] = np.exp(optparams[0])
+            optstring = r'Opt $\sigma_fine$ =' + str(np.exp(optparams[0]))
         elif self.opt_type == 'sig_reward':
             self.model_params['fine_sigma'] = np.exp(optparams[0])
             self.model_params['reward'] = np.exp(optparams[1])
+            optstring = r'Opt $\sigma_fine$ =' + str(np.exp(optparams[0]))
         elif self.opt_type == 'sig_punish':
             self.model_params['fine_sigma'] = np.exp(optparams[0])
             self.model_params['punishment'] = np.exp(optparams[1])
@@ -116,7 +118,7 @@ class OptAnalysis:
             sns.kdeplot(sim_abs_rts, bw=0.1, shade=True, c='purple', ax=axes[i],
                         label="Sim correct absent")
             sns.kdeplot(sim_pres_rts, bw=0.1, shade=True, c='orange', ax=axes[i],
-                        label="Data correct present")
+                        label="Sim correct present")
             axes[i].legend(loc="upper right")
             axes[i].set_title(str(N))
 
