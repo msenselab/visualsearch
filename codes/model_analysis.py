@@ -163,6 +163,7 @@ class OptAnalysis:
 
 if __name__ == '__main__':
     from pathlib import Path
+    import os
     datapath = Path('~/Documents/fit_data/')
 
     subjects = list(range(1, 12))
@@ -176,6 +177,9 @@ if __name__ == '__main__':
     for model in models:
         opt_type, reward_scheme, fine_model = model
         savepath = datapath.joinpath('./{}_{}_{}'.format(opt_type, reward_scheme, fine_model))
+        if not os.path.exists(str(savepath.expanduser())):
+            os.mkdir(str(savepath.expanduser()))
+
         for subject in subjects:
             filename = './subject_{}_{}_{}_{}_modelfit.p'.format(subject, opt_type,
                                                                  reward_scheme, fine_model)
