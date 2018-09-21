@@ -79,20 +79,23 @@ class OptAnalysis:
 
         if self.opt_type == 'sig':
             self.model_params['fine_sigma'] = np.exp(optparams[0])
-            optstring = r'Opt $\sigma_fine$ =' + str(np.exp(optparams[0]))
+            optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams[0]))[:5]
         elif self.opt_type == 'sig_reward':
             self.model_params['fine_sigma'] = np.exp(optparams[0])
             self.model_params['reward'] = np.exp(optparams[1])
-            optstring = r'Opt $\sigma_fine$ =' + str(np.exp(optparams[0]))
+            optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams[0]))[:5] +\
+                ' reward =' + str(np.exp(optparams[1]))[:5]
         elif self.opt_type == 'sig_punish':
             self.model_params['fine_sigma'] = np.exp(optparams[0])
             self.model_params['punishment'] = np.exp(optparams[1])
+            optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams[0]))[:5] +\
+                ' punishment =' + str(np.exp(optparams[1]))[:5]
         finegr = FineGrained(**self.model_params)
         coarse_stats = finegr.coarse_stats
         subject_data = DataLikelihoods(**self.model_params)
 
-        fig, axes = plt.subplots(len(self.model_params['N_values']), 1,
-                                 sharex=True, figsize=(10, 10))
+        fig, axes = plt.subplots(len(self.model_params['N_values']), 3,
+                                 figsize=(22, 14))
         for i in range(len(self.model_params['N_values'])):
             curr_params = deepcopy(self.model_params)
             N = curr_params['N_values'][i]
@@ -108,24 +111,67 @@ class OptAnalysis:
             # Only plotting the correct responses, but the data should fit all incl. incorr
             corr_abs_rts = N_data.query('resp == 2 & target == \'Absent\'').rt.values
             corr_pres_rts = N_data.query('resp == 1 & target == \'Present\'').rt.values
+            inc_abs_rts = N_data.query('resp == 2 & target == \'Present\'').rt.values
+            inc_pres_rts = N_data.query('resp == 1 & target == \'Absent\'').rt.values
+
             sim_abs_rts = obs.rt_abs[obs.rt_abs[:, 0] == 0, 1]
+            sim_inc_abs_rts = obs.rt_pres[obs.rt_pres[:, 0] == 0, 1]
             sim_pres_rts = obs.rt_pres[obs.rt_pres[:, 0] == 1, 1]
+            sim_inc_pres_rts = obs.rt_abs[obs.rt_abs[:, 0] == 1, 1]
 
-            sns.kdeplot(corr_abs_rts, bw=0.1, shade=True, c='blue', ax=axes[i],
+            sns.kdeplot(corr_abs_rts, bw=0.1, shade=True, c='blue', ax=axes[i, 0],
                         label="Data correct absent")
-            sns.kdeplot(corr_pres_rts, bw=0.1, shade=True, c='red', ax=axes[i],
+            sns.kdeplot(corr_pres_rts, bw=0.1, shade=True, c='red', ax=axes[i, 0],
                         label="Data correct present")
-            sns.kdeplot(sim_abs_rts, bw=0.1, shade=True, c='purple', ax=axes[i],
+            sns.kdeplot(sim_abs_rts, bw=0.1, shade=True, c='purple', ax=axes[i, 0],
                         label="Sim correct absent")
-            sns.kdeplot(sim_pres_rts, bw=0.1, shade=True, c='orange', ax=axes[i],
+            sns.kdeplot(sim_pres_rts, bw=0.1, shade=True, c='orange', ax=axes[i, 0],
                         label="Sim correct present")
-            axes[i].legend(loc="upper right")
-            axes[i].set_title(str(N))
+            axes[i, 0].legend(loc="upper right")
+            axes[i, 0].set_title(str(N) + ' correct')
+            axes[i, 0].set_xlim([0, self.model_params['T']])
 
-        axes[-1].set_xlabel('RT (s)')
-        axes[-1].set_xlim([0, self.model_params['T']])
-        fig.suptitle("Subject {} {} optimization, {} fine model, {} reward scheme".format(
-                     self.subject_num, self.opt_type, self.fine_model, self.reward_scheme), size=24)
+            sns.kdeplot(inc_abs_rts, bw=0.1, shade=True, c='blue', ax=axes[i, 1],
+                        label="Data incorrect absent")
+            sns.kdeplot(inc_pres_rts, bw=0.1, shade=True, c='red', ax=axes[i, 1],
+                        label="Data incorrect present")
+            sns.kdeplot(sim_inc_abs_rts, bw=0.1, shade=True, c='purple', ax=axes[i, 1],
+                        label="Sim incorrect absent")
+            sns.kdeplot(sim_inc_pres_rts, bw=0.1, shade=True, c='orange', ax=axes[i, 1],
+                        label="Sim incorrect present")
+
+            axes[i, 1].legend(loc="upper right")
+            axes[i, 1].set_title(str(N) + ' incorrect')
+            axes[i, 1].set_xlim([0, self.model_params['T']])
+
+            totresp_data = len(corr_abs_rts) + len(corr_pres_rts) +\
+                len(inc_abs_rts) + len(inc_pres_rts)
+            totresp_sim = len(sim_abs_rts) + len(sim_pres_rts) +\
+                len(sim_inc_abs_rts) + len(sim_inc_pres_rts)
+
+            bars = axes[i, 2].bar([0, 1, 2, 3, 5, 6, 7, 8],
+                                  [len(corr_abs_rts) / totresp_data,
+                                   len(sim_abs_rts) / totresp_sim,
+                                   len(inc_abs_rts) / totresp_data,
+                                   len(sim_inc_abs_rts) / totresp_sim,
+                                   len(corr_pres_rts) / totresp_data,
+                                   len(sim_pres_rts) / totresp_sim,
+                                   len(inc_pres_rts) / totresp_data,
+                                   len(sim_inc_pres_rts) / totresp_sim],
+                                  width=1)
+            colors = ['blue', 'purple', 'blue', 'purple', 'red', 'orange', 'red', 'orange']
+            for k in range(len(colors)):
+                bars[k].set_color(colors[k])
+            axes[i, 2].set_xticks([1, 3, 6, 8])
+            axes[i, 2].set_xticklabels([])
+            axes[i, 2].set_title('Proportion Responses')
+        for j in range(2):
+            axes[-1, j].set_xlabel('RT (s)')
+        axes[2, 2].set_xticklabels(['Correct Absent', 'Incorrect Absent',
+                                    'Correct Present', 'Incorrect Present'], rotation=40)
+        fig.suptitle("Subject {} {} optimization, {} fine model, {} reward scheme\n {}".format(
+                     self.subject_num, self.opt_type, self.fine_model,
+                     self.reward_scheme, optstring), size=24)
         return fig, axes
 
     def save_anim_likelihoods(self, savepath, numframes=420):
