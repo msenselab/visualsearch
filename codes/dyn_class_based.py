@@ -144,7 +144,7 @@ if __name__ == '__main__':
                     'N_values': (8, 12, 16),
                     'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                     'subject_num': subject_num,
-                    'numsims': 45000}
+                    'numsims': 55000}
 
     print('Subject number {}'.format(subject_num))
 
