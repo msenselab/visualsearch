@@ -58,8 +58,9 @@ class OptAnalysis:
                 ax.set_xlabel(r'$\sigma_{fine}$', size=20)
                 ax.set_ylabel('Punishment', size=20)
             ax.set_zlabel('log(likelihood)', size=20)
-            ax.set_title("Subject {} {} optimization, {} fine model, {} reward scheme".format(
-                         self.subject_num, self.opt_type, self.fine_model, self.reward_scheme))
+            ax.set_title("Subject {} {} optimization, {} fine model, {} reward scheme\n".format(
+                         self.subject_num, self.opt_type, self.fine_model, self.reward_scheme) +
+                         "Optimum at {:.3f} {:.3f}".format(x[np.argmin(z)], y[np.argmin(z)]))
         else:
             fig = plt.figure(figsize=(10, 10))
             ax = fig.add_subplot(111)
@@ -196,11 +197,12 @@ class OptAnalysis:
             ax.set_xlabel(r'$\sigma_{fine}$', size=20)
             ax.set_ylabel('Punishment', size=20)
         ax.set_zlabel('log(likelihood)', size=20)
-        ax.set_title("Subject {} {} optimization, {} fine model, {} reward scheme".format(
-                     self.subject_num, self.opt_type, self.fine_model, self.reward_scheme))
+        ax.set_title("Subject {} {} optimization, {} fine model, {} reward scheme\n".format(
+                     self.subject_num, self.opt_type, self.fine_model, self.reward_scheme) +
+                     "Optimum at {:.3f} {:.3f}".format(x[np.argmin(z)], y[np.argmin(z)]))
 
         def anim_update(i):
-            ax.view_init(azim=(i / numframes) * 360)
+            ax.view_init(azim=(i / numframes) * 360, elev=30)
             plt.draw()
             return
 

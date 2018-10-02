@@ -20,7 +20,7 @@ from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 import pickle
 
-num_samples = 2950
+num_samples = 250
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 
@@ -107,6 +107,7 @@ def modelfit(arglist):
         bnds = np.array(((-1.7, 2.5),))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                       bounds=bnds, n_pre_samples=50)
+
     if model_type[0] == 'sig_reward':
         bnds = np.array(((-1.7, 2.5), (-1., 0.5)))  # [n_variables, 2] shaped array with bounds
         x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,

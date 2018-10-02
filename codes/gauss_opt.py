@@ -10,6 +10,7 @@ import sklearn.gaussian_process as gp
 from scipy.stats import norm
 from scipy.optimize import minimize
 
+
 def expected_improvement(x, gaussian_process, evaluated_loss, greater_is_better=False, n_params=1):
     """ expected_improvement
     Expected improvement acquisition function.
