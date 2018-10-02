@@ -20,7 +20,7 @@ from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 import pickle
 
-num_samples = 250
+num_samples = 650
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 
@@ -143,7 +143,8 @@ if __name__ == '__main__':
                     'lapse': 1e-6,
                     'N_values': (8, 12, 16),
                     'g_values': np.linspace(1e-4, 1 - 1e-4, size),
-                    'subject_num': subject_num}
+                    'subject_num': subject_num,
+                    'numsims': 45000}
 
     print('Subject number {}'.format(subject_num))
 
