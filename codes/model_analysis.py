@@ -115,10 +115,11 @@ class OptAnalysis:
             inc_abs_rts = N_data.query('resp == 2 & target == \'Present\'').rt.values
             inc_pres_rts = N_data.query('resp == 1 & target == \'Absent\'').rt.values
 
-            sim_abs_rts = obs.rt_abs[obs.rt_abs[:, 0] == 0, 1]
-            sim_inc_abs_rts = obs.rt_pres[obs.rt_pres[:, 0] == 0, 1]
-            sim_pres_rts = obs.rt_pres[obs.rt_pres[:, 0] == 1, 1]
-            sim_inc_pres_rts = obs.rt_abs[obs.rt_abs[:, 0] == 1, 1]
+            t_values = np.arange(0, curr_params['T'], curr_params['dt'])
+            sim_abs_rts = obs.fractions[0][0, :] / np.sum(obs.fractions[0][0, :])
+            sim_inc_abs_rts = obs.fractions[0][1, :] / np.sum(obs.fractions[0][1, :])
+            sim_pres_rts = obs.fractions[1][1, :] / np.sum(obs.fractions[1][1, :])
+            sim_inc_pres_rts = obs.fractions[1][0, :] / np.sum(obs.fractions[1][0, :])
 
             sns.kdeplot(corr_abs_rts, bw=0.1, shade=True, c='blue', ax=axes[i, 0],
                         label="Data correct absent")
@@ -126,8 +127,11 @@ class OptAnalysis:
                         label="Data correct present")
             sns.kdeplot(sim_abs_rts, bw=0.1, shade=True, c='purple', ax=axes[i, 0],
                         label="Sim correct absent")
-            sns.kdeplot(sim_pres_rts, bw=0.1, shade=True, c='orange', ax=axes[i, 0],
-                        label="Sim correct present")
+            axes[i, 0].fill_between(t_values, sim_abs_rts, color='purple',
+                                    label='Sim correct absent')
+            axes[i, 0].fill_between(t_values, sim_pres_rts, color='orange',
+                                    label='Sim correct present')
+
             axes[i, 0].legend(loc="upper right")
             axes[i, 0].set_title(str(N) + ' correct')
             axes[i, 0].set_xlim([0, self.model_params['T']])
@@ -136,10 +140,10 @@ class OptAnalysis:
                         label="Data incorrect absent")
             sns.kdeplot(inc_pres_rts, bw=0.1, shade=True, c='red', ax=axes[i, 1],
                         label="Data incorrect present")
-            sns.kdeplot(sim_inc_abs_rts, bw=0.1, shade=True, c='purple', ax=axes[i, 1],
-                        label="Sim incorrect absent")
-            sns.kdeplot(sim_inc_pres_rts, bw=0.1, shade=True, c='orange', ax=axes[i, 1],
-                        label="Sim incorrect present")
+            axes[i, 1].fill_between(t_values, sim_inc_abs_rts, color='purple',
+                                    label='Sim incorrect absent')
+            axes[i, 1].fill_between(t_values, sim_inc_pres_rts, color='orange',
+                                    label='Sim incorrect present')
 
             axes[i, 1].legend(loc="upper right")
             axes[i, 1].set_title(str(N) + ' incorrect')
@@ -147,18 +151,16 @@ class OptAnalysis:
 
             totresp_data = len(corr_abs_rts) + len(corr_pres_rts) +\
                 len(inc_abs_rts) + len(inc_pres_rts)
-            totresp_sim = len(sim_abs_rts) + len(sim_pres_rts) +\
-                len(sim_inc_abs_rts) + len(sim_inc_pres_rts)
 
             bars = axes[i, 2].bar([0, 1, 2, 3, 5, 6, 7, 8],
                                   [len(corr_abs_rts) / totresp_data,
-                                   len(sim_abs_rts) / totresp_sim,
+                                   np.sum(obs.fractions[0][0, :]),
                                    len(inc_abs_rts) / totresp_data,
-                                   len(sim_inc_abs_rts) / totresp_sim,
+                                   np.sum(obs.fractions[0][1, :]),
                                    len(corr_pres_rts) / totresp_data,
-                                   len(sim_pres_rts) / totresp_sim,
+                                   np.sum(obs.fractions[1][1, :]),
                                    len(inc_pres_rts) / totresp_data,
-                                   len(sim_inc_pres_rts) / totresp_sim],
+                                   np.sum(obs.fractions[1][0, :])],
                                   width=1)
             colors = ['blue', 'purple', 'blue', 'purple', 'red', 'orange', 'red', 'orange']
             for k in range(len(colors)):
@@ -233,7 +235,10 @@ if __name__ == '__main__':
         for subject in subjects:
             filename = './subject_{}_{}_{}_{}_modelfit.p'.format(subject, opt_type,
                                                                  reward_scheme, fine_model)
-            sub_fit = np.load(datapath.joinpath(filename).expanduser())
+            try:
+                sub_fit = np.load(datapath.joinpath(filename).expanduser())
+            except FileNotFoundError:
+                continue
             if 'opt_type' not in sub_fit:
                 sub_fit['opt_type'] = opt_type
 

@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from scipy.interpolate import interp1d
 
 
 class DataLikelihoods:
@@ -25,7 +26,71 @@ class DataLikelihoods:
         self.sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
         self.likelihood = 0.
 
-    def increment_likelihood(self, dist_matrix, rts_matrix, N, reward, lapse, **kwargs):
+    def increment_likelihood(self, fractions, T, dt, N, reward, lapse, **kwargs):
+        """
+        Increments internal likelihood with the likelihood of given dists and rts
+
+        Parameters
+        ----------
+        dist_matrix : 2 x 2 matrix of simulated data distributions (KDE) produced by obs class
+        rts_matrix : 2 x 2 matrix of simulated reaction times (each entry a list of RTs) also
+            produced by obs class
+        N : N for given set of sim data
+        reward : curr reward from optimizer
+        lapse : lapse rate hyperparameter
+
+        Outputs
+        ----------
+        Increment to self.likelihood
+
+        """
+        N_data = self.sub_data.query('setsize == {}'.format(N))
+        temp = np.mean(np.array(N_data['rt']))
+        t_values = np.arange(0, T, dt)
+        d_eval = 1e-4
+        evalpoints = np.arange(0, t_values[-1], d_eval)
+        normfactors = np.zeros((2, 3))
+        likelihood_funcs = np.zeros((2, 3), dtype=object)
+        for condition in (0, 1):
+            for response in (0, 1, 2):
+                curr_func = interp1d(t_values, fractions[condition][response, :])
+                likelihood_funcs[condition, response] = curr_func
+                normfactors[condition, response] = np.sum(curr_func(evalpoints)) * d_eval
+
+        subj_rts = np.zeros((2, 2), dtype=object)
+        subj_rts[0, 0] = N_data.query('resp == 2 & target == \'Absent\'').rt.values
+        subj_rts[0, 1] = N_data.query('resp == 1 & target == \'Absent\'').rt.values
+
+        subj_rts[1, 0] = N_data.query('resp == 2 & target == \'Present\'').rt.values
+        subj_rts[1, 1] = N_data.query('resp == 1 & target == \'Present\'').rt.values
+
+        subj_rt_likelihoods = np.zeros((2, 2), dtype=object)
+        for c in (0, 1):
+            for r in (0, 1):
+                if len(subj_rts[c, r]) == 0:
+                    subj_rt_likelihoods[c, r] = np.array([1e-5])
+                else:
+                    subj_rt_likelihoods[c, r] = likelihood_funcs[c, r](subj_rts[c, r])
+
+        with np.errstate(divide='ignore'):
+            log_like_abs = np.concatenate((np.log(np.sum(fractions[0][0, :])) +
+                                           np.log(subj_rt_likelihoods[0, 0]),
+                                           np.log(np.sum(fractions[0][1, :])) +
+                                           np.log(subj_rt_likelihoods[0, 1])))
+
+            log_like_pres = np.concatenate((np.log(np.sum(fractions[1][0, :])) +
+                                            np.log(subj_rt_likelihoods[1, 0]),
+                                            np.log(np.sum(fractions[1][1, :])) +
+                                            np.log(subj_rt_likelihoods[1, 1])))
+
+        log_like_all = np.concatenate((log_like_pres, log_like_abs))
+
+        likelihood_pertrial = (1 - lapse) * np.exp(log_like_all) + \
+            (lapse / 2) * np.exp(-reward / temp)
+
+        self.likelihood += -np.sum(np.log(likelihood_pertrial))
+
+    def increment_likelihood_legacy(self, dist_matrix, rts_matrix, N, reward, lapse, **kwargs):
         """
         Increments internal likelihood with the likelihood of given dists and rts
 

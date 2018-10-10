@@ -30,8 +30,7 @@ def likelihood_inner_loop(curr_params):
     curr_params['decisions'] = bellutil.decisions
 
     obs = ObserverSim(**curr_params)
-    curr_params['dist_matrix'] = obs.dist_matrix
-    curr_params['rts_matrix'] = obs.rts_matrix
+    curr_params['fractions'] = obs.fractions
     return curr_params
 
 

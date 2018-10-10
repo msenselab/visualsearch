@@ -1,9 +1,10 @@
 import numpy as np
-from scipy.stats import uniform, gaussian_kde
+from scipy.stats import uniform, gaussian_kde, norm
 
 
 class ObserverSim:
-    def __init__(self, T, dt, g_values, sigma, mu, decisions, numsims=5000, **kwargs):
+    def __init__(self, T, dt, g_values, sigma, mu, decisions, simulate=False, numsims=5000,
+                 **kwargs):
         """
         Generates a pool of observers and, given decision bounds, produces simulated reaction times
 
@@ -27,20 +28,52 @@ class ObserverSim:
             (condition, response) pair.
 
         """
-        presence_list = [0] * numsims + [1] * numsims
-        observer_responses = []
-        for C in presence_list:
-            observer_responses.append(self.simulate_observer(T, dt, g_values, mu,
-                                                             sigma, decisions, C))
+        if simulate:
+            presence_list = [0] * numsims + [1] * numsims
+            observer_responses = []
+            for C in presence_list:
+                observer_responses.append(self.simulate_observer(T, dt, g_values, mu,
+                                                                 sigma, decisions, C))
 
-        response_info = np.array([(x[0], x[1]) for x in observer_responses])
-        self.numsims = numsims
-        self.rt_abs = response_info[:numsims]
-        self.rt_pres = response_info[numsims:]
-        self.dist_matrix, self.rts_matrix = self.get_kde_dist()
+            response_info = np.array([(x[0], x[1]) for x in observer_responses])
+            self.numsims = numsims
+            self.rt_abs = response_info[:numsims]
+            self.rt_pres = response_info[numsims:]
+            self.dist_matrix, self.rts_matrix = self.get_kde_dist()
+        else:
+            self.decisions = decisions
+            dg = g_values[1] - g_values[0]
+            prob_grid_abs = self.fixed_trans_probs(sigma, mu, g_values, 0) * dg
+            prob_grid_pres = self.fixed_trans_probs(sigma, mu, g_values, 1) * dg
+            fractions_abs = self.fp_observer_diffusion(T, dt, sigma, mu, prob_grid_abs, g_values)
+            fractions_pres = self.fp_observer_diffusion(T, dt, sigma, mu, prob_grid_pres, g_values)
+            self.fractions = (fractions_abs, fractions_pres)
+
+    def g_to_D(self, g_t):
+        return np.log(g_t / (1 - g_t))
 
     def D_to_g(self, D_t):
         return np.exp(D_t) / (1 + np.exp(D_t))
+
+    def p_gtp1_C(self, C, g_t, g_tp1, sigma, mu):
+        D_t = self.g_to_D(g_t)
+        D_tp1 = self.g_to_D(g_tp1)
+        jacobian_factor = 1 / (self.D_to_g(D_t) * (1 - self.D_to_g(D_t)))
+
+        draw = norm.pdf(D_tp1, D_t + mu[C], sigma[C])
+
+        return jacobian_factor * draw
+
+    def fixed_trans_probs(self, sigma, mu, g_values, C):
+        dg = g_values[1] - g_values[0]
+        size = g_values.shape[0]
+        prob_grid = np.zeros((size, size))
+        for i, g_t in enumerate(g_values):
+            updates = self.p_gtp1_C(C, g_t, g_values, sigma, mu)
+            updates = updates / (np.sum(updates) * dg)
+            prob_grid[i, :] = updates
+
+        return prob_grid
 
     def simulate_observer(self, T, dt, g_values, mu, sigma, decisions, C):
         if C != 1 and C != 0:
@@ -72,6 +105,24 @@ class ObserverSim:
 
         # Return NaN if end of trial reached with no decision
         return (np.NaN, T, g_trajectory, D_trajectory)
+
+    def fp_observer_diffusion(self, T, dt, sigma, mu, prob_grid, g_values):
+        observerarr = np.zeros((g_values.shape[0], int(T / dt)))
+        observerarr[int(observerarr.shape[0] / 2), 0] = 1
+
+        fractions = np.zeros((3, int(T / dt)))
+        fractions[2, 0] = 1
+        for i in range(1, int(T / dt)):
+            currstep = np.zeros(g_values.shape[0])
+            for j, g_t in enumerate(g_values):
+                currstep = currstep + prob_grid[j, :] * observerarr[j, i-1]
+            lowerbound = np.amax(np.where(self.decisions[:, i] == 1)[0]) + 1
+            upperbound = np.where(self.decisions[:, i] == 2)[0][0]
+            observerarr[lowerbound:upperbound, i] = currstep[lowerbound:upperbound]
+            fractions[2, i] = np.sum(currstep[lowerbound:upperbound])
+            fractions[0, i] = np.sum(currstep[:lowerbound])
+            fractions[1, i] = np.sum(currstep[upperbound:])
+        return fractions
 
     def get_kde_dist(self):
         dists = []
