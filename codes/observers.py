@@ -43,8 +43,8 @@ class ObserverSim:
         else:
             self.decisions = decisions
             dg = g_values[1] - g_values[0]
-            prob_grid_abs = self.fixed_trans_probs(sigma, mu, g_values, 0) * dg
-            prob_grid_pres = self.fixed_trans_probs(sigma, mu, g_values, 1) * dg
+            prob_grid_abs = self.fixed_trans_probs(sigma * dt, mu * dt, g_values, 0) * dg
+            prob_grid_pres = self.fixed_trans_probs(sigma * dt, mu * dt, g_values, 1) * dg
             fractions_abs = self.fp_observer_diffusion(T, dt, sigma, mu, prob_grid_abs, g_values)
             fractions_pres = self.fp_observer_diffusion(T, dt, sigma, mu, prob_grid_pres, g_values)
             self.fractions = (fractions_abs, fractions_pres)

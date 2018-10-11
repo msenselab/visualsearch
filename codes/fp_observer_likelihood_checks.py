@@ -49,10 +49,13 @@ def comparisons(arglist):
     sim_likelihood = DataLikelihoods(subject_num)
     fp_likelihood = DataLikelihoods(subject_num)
 
-    fp_value = fp_likelihood.increment_likelihood(fpobs.fractions, **fp_params)
-    sim_value = sim_likelihood.increment_likelihood_legacy(simobs.dist_matrix,
-                                                           simobs.rts_matrix,
-                                                           **sim_params)
+    fp_likelihood.increment_likelihood(fpobs.fractions, **fp_params)
+    sim_likelihood.increment_likelihood_legacy(simobs.dist_matrix,
+                                               simobs.rts_matrix,
+                                               **sim_params)
+
+    fp_value = fp_likelihood.likelihood
+    sim_value = sim_likelihood.likelihood
     return (fp_value, sim_value, i, j)
 
 
