@@ -67,10 +67,7 @@ class DataLikelihoods:
         subj_rt_likelihoods = np.zeros((2, 2), dtype=object)
         for c in (0, 1):
             for r in (0, 1):
-                if len(subj_rts[c, r]) == 0:
-                    subj_rt_likelihoods[c, r] = np.array([1e-5])
-                else:
-                    subj_rt_likelihoods[c, r] = likelihood_funcs[c, r](subj_rts[c, r])
+                subj_rt_likelihoods[c, r] = likelihood_funcs[c, r](subj_rts[c, r]) / normfactors[c, r]
 
         with np.errstate(divide='ignore'):
             log_like_abs = np.concatenate((np.log(np.sum(fractions[0][0, :])) +

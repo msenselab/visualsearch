@@ -4,7 +4,6 @@ from bellman_utilities import BellmanUtil
 from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 from copy import deepcopy
-from pathlib import Path
 import pickle
 import itertools as it
 from multiprocess import Pool
