@@ -8,7 +8,7 @@ import pickle
 import itertools as it
 from multiprocess import Pool
 
-subject_num = 1
+subject_num = 5
 size = 100
 model_params = {'T': 10,
                 'dt': 0.05,

@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from copy import deepcopy
 import multiprocess as mulpro
+import itertools as it
 from gauss_opt import bayesian_optimisation
 from fine_grain_model import FineGrained
 from bellman_utilities import BellmanUtil
@@ -20,10 +21,10 @@ from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 import pickle
 
-num_samples = 400
+num_samples = 3600
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
-
+gridsearch = True
 
 def likelihood_inner_loop(curr_params):
     bellutil = BellmanUtil(**curr_params)
@@ -44,8 +45,8 @@ def subject_likelihood(likelihood_arglist):
     # Handling what to optimize and what to hold constant
     if model_type[0] == 'sig':
         # Only fine_sigma is fit
-        fine_sigma = np.exp(log_parameters)
-        print('fine_sigma =', fine_sigma)
+        fine_sigma = np.exp(log_parameters[0])
+        print('fine_sigma =', fine_sigma, '|| model_type = ', model_type)
 
         model_params['fine_sigma'] = fine_sigma
         model_params['reward'] = 1
@@ -54,7 +55,7 @@ def subject_likelihood(likelihood_arglist):
         # fine_sigma and reward are fit, punishment fixed at 0
         fine_sigma = np.exp(log_parameters[0])
         reward = np.exp(log_parameters[1])
-        print('fine_sigma =', fine_sigma, '| reward =', reward)
+        print('fine_sigma =', fine_sigma, '| reward =', reward, '|| model_type = ', model_type)
 
         model_params['fine_sigma'] = fine_sigma
         model_params['reward'] = reward
@@ -63,7 +64,8 @@ def subject_likelihood(likelihood_arglist):
         # fine_sigma and punishment are fit, reward fixed at 1
         fine_sigma = np.exp(log_parameters[0])
         punishment = np.exp(log_parameters[1])
-        print('fine_sigma =', fine_sigma, '| punishment =', punishment)
+        print('fine_sigma =', fine_sigma, '| punishment =', punishment,
+              '|| model_type = ', model_type)
 
         model_params['fine_sigma'] = fine_sigma
         model_params['reward'] = 1
@@ -98,24 +100,61 @@ def modelfit(arglist):
     model_params['reward_scheme'] = model_type[1]
     model_params['opt_type'] = model_type[0]
 
-    def likelihood_for_opt(log_parameters):
-        likelihood_arglist = model_type, log_parameters, model_params
-        return subject_likelihood(likelihood_arglist)
+    if not gridsearch:
+        def likelihood_for_opt(log_parameters):
+            likelihood_arglist = model_type, log_parameters, model_params
+            return subject_likelihood(likelihood_arglist)
 
-    if model_type[0] == 'sig':
-        bnds = np.array(((-1.7, 2.5),))  # [n_variables, 2] shaped array with bounds
-        x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                      bounds=bnds, n_pre_samples=50)
+        if model_type[0] == 'sig':
+            bnds = np.array(((-1.7, 2.5),))  # [n_variables, 2] shaped array with bounds
+            x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
+                                          bounds=bnds, n_pre_samples=50)
 
-    if model_type[0] == 'sig_reward':
-        bnds = np.array(((-1.7, 2.5), (-1., 0.5)))  # [n_variables, 2] shaped array with bounds
-        x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                      bounds=bnds, n_pre_samples=50)
+        if model_type[0] == 'sig_reward':
+            bnds = np.array(((-1.7, 2.5), (-1., 0.5)))  # [n_variables, 2] shaped array with bounds
+            x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
+                                          bounds=bnds, n_pre_samples=50)
 
-    if model_type[0] == 'sig_punish':
-        bnds = np.array(((-1.7, 2.5), (-5., 1.)))  # [n_variables, 2] shaped array with bounds
-        x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                      bounds=bnds, n_pre_samples=50)
+        if model_type[0] == 'sig_punish':
+            bnds = np.array(((-1.7, 2.5), (-5., 1.)))  # [n_variables, 2] shaped array with bounds
+            x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
+                                          bounds=bnds, n_pre_samples=50)
+    else:
+        dim_size = int(np.sqrt(num_samples))
+        def likelihood_for_opt(log_parameters):
+            likelihood_arglist = model_type, log_parameters, model_params
+            return subject_likelihood(likelihood_arglist)
+
+        if model_type[0] == 'sig':
+            bnds = np.array(((0.1, 1.5),))
+            log_param_list = np.log(np.linspace(bnds[0][0], bnds[0][1], num_samples))
+            likelihoods_returned = np.zeros_like(log_param_list)
+            for idx, log_param in enumerate(log_param_list):
+                likelihoods_returned[idx] = subject_likelihood([model_type, (log_param, ),
+                                                                model_params])
+            x_opt = (log_param_list, likelihoods_returned)
+
+        if model_type[0] == 'sig_reward':
+            bnds = np.array(((0.1, 1.5), (0.6, 1.5)))  # [n_variables, 2] shaped array with bounds
+            log_sigma_list = np.log(np.linspace(bnds[0][0], bnds[0][1], dim_size))
+            log_reward_list = np.log(np.linspace(bnds[1][0], bnds[1][1], dim_size))
+            log_param_pairs = np.array(list(it.product(log_sigma_list, log_reward_list)))
+            likelihoods_returned = np.zeros(log_param_pairs.shape[0])
+            for idx, log_params in enumerate(log_param_pairs):
+                likelihoods_returned[idx] = subject_likelihood([model_type, log_params,
+                                                                model_params])
+            x_opt = (log_param_pairs, likelihoods_returned)
+
+        if model_type[0] == 'sig_punish':
+            bnds = np.array(((0.1, 1.5), (0.6, 1.5)))  # [n_variables, 2] shaped array with bounds
+            log_sigma_list = np.log(np.linspace(bnds[0][0], bnds[0][1], dim_size))
+            log_punish_list = np.log(np.linspace(bnds[1][0], bnds[1][1], dim_size))
+            log_param_pairs = np.array(list(it.product(log_sigma_list, log_punish_list)))
+            likelihoods_returned = np.zeros(log_param_pairs.shape[0])
+            for idx, log_params in enumerate(log_param_pairs):
+                likelihoods_returned[idx] = subject_likelihood([model_type, log_params,
+                                                                model_params])
+            x_opt = (log_param_pairs, likelihoods_returned)
 
     model_params['tested_params'], model_params['likelihoods_returned'] = x_opt
     fw = open(savepath + '/subject_{}_{}_{}_{}_modelfit.p'.format(subject_num, *model_type), 'wb')
@@ -142,18 +181,18 @@ if __name__ == '__main__':
                     'lapse': 1e-6,
                     'N_values': (8, 12, 16),
                     'g_values': np.linspace(1e-4, 1 - 1e-4, size),
-                    'subject_num': subject_num,
-                    'numsims': 55000}
+                    'subject_num': subject_num,}
 
     print('Subject number {}'.format(subject_num))
 
     model_list = [
         ('sig', 'sym', 'const'),
         ('sig_reward', 'asym_reward', 'const'),
-        ('sig_punish', 'epsilon_punish', 'const'),
+        #('sig_punish', 'epsilon_punish', 'const'),
         ('sig', 'sym', 'sqrt'),
         ('sig_reward', 'asym_reward', 'sqrt'),
-        ('sig_punish', 'epsilon_punish', 'sqrt')]
+        #('sig_punish', 'epsilon_punish', 'sqrt'),
+        ]
 
     master_arglists = [(model, model_params) for model in model_list]
     processes = [None] * len(model_list)

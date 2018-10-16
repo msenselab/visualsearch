@@ -64,12 +64,12 @@ class DataLikelihoods:
         subj_rts[1, 0] = N_data.query('resp == 2 & target == \'Present\'').rt.values
         subj_rts[1, 1] = N_data.query('resp == 1 & target == \'Present\'').rt.values
 
-        subj_rt_likelihoods = np.zeros((2, 2), dtype=object)
-        for c in (0, 1):
-            for r in (0, 1):
-                subj_rt_likelihoods[c, r] = likelihood_funcs[c, r](subj_rts[c, r]) / normfactors[c, r]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            subj_rt_likelihoods = np.zeros((2, 2), dtype=object)
+            for c in (0, 1):
+                for r in (0, 1):
+                    subj_rt_likelihoods[c, r] = likelihood_funcs[c, r](subj_rts[c, r]) / normfactors[c, r]
 
-        with np.errstate(divide='ignore'):
             log_like_abs = np.concatenate((np.log(np.sum(fractions[0][0, :])) +
                                            np.log(subj_rt_likelihoods[0, 0]),
                                            np.log(np.sum(fractions[0][1, :])) +
