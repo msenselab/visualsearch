@@ -25,6 +25,8 @@ class OptAnalysis:
                              'reward_scheme': reward_scheme,
                              }
         self.tested_params = tested_params
+        filt = np.invert(np.isnan(likelihoods_returned))
+        likelihoods_returned[np.isnan(likelihoods_returned)] = np.amax(likelihoods_returned[filt])
         self.likelihoods_returned = likelihoods_returned
         self.opt_type = opt_type
         self.subject_num = subject_num
@@ -79,8 +81,8 @@ class OptAnalysis:
         optparams = self.tested_params[opt_index]
 
         if self.opt_type == 'sig':
-            self.model_params['fine_sigma'] = np.exp(optparams[0])
-            optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams[0]))[:5]
+            self.model_params['fine_sigma'] = np.exp(optparams)
+            optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams))[:5]
         elif self.opt_type == 'sig_reward':
             self.model_params['fine_sigma'] = np.exp(optparams[0])
             self.model_params['reward'] = np.exp(optparams[1])
@@ -94,9 +96,9 @@ class OptAnalysis:
         finegr = FineGrained(**self.model_params)
         coarse_stats = finegr.coarse_stats
         subject_data = DataLikelihoods(**self.model_params)
+        sim_rt_means = np.zeros((len(self.model_params['N_values']), 2))
 
-        fig, axes = plt.subplots(len(self.model_params['N_values']), 3,
-                                 figsize=(22, 14))
+        fig, axes = plt.subplots(len(self.model_params['N_values']), 4, figsize=(22, 14))
         for i in range(len(self.model_params['N_values'])):
             curr_params = deepcopy(self.model_params)
             N = curr_params['N_values'][i]
@@ -115,21 +117,24 @@ class OptAnalysis:
             inc_abs_rts = N_data.query('resp == 2 & target == \'Present\'').rt.values
             inc_pres_rts = N_data.query('resp == 1 & target == \'Absent\'').rt.values
 
-            t_values = np.arange(0, curr_params['T'], curr_params['dt'])
-            sim_abs_rts = obs.fractions[0][0, :] / np.sum(obs.fractions[0][0, :])
-            sim_inc_abs_rts = obs.fractions[0][1, :] / np.sum(obs.fractions[0][1, :])
-            sim_pres_rts = obs.fractions[1][1, :] / np.sum(obs.fractions[1][1, :])
-            sim_inc_pres_rts = obs.fractions[1][0, :] / np.sum(obs.fractions[1][0, :])
+            T = curr_params['T']
+            dt = curr_params['dt']
+            t_values = np.arange(0, T, dt)
+            t_centers = t_values + (dt / 2)
+            sim_abs_rts = obs.fractions[0][0, :] / (np.sum(obs.fractions[0][0, :]) * dt)
+            sim_rt_means[i, 0] = np.sum(sim_abs_rts * t_centers * dt)
+            sim_inc_abs_rts = obs.fractions[0][1, :] / (np.sum(obs.fractions[0][1, :]) * dt)
+            sim_pres_rts = obs.fractions[1][1, :] / (np.sum(obs.fractions[1][1, :]) * dt)
+            sim_rt_means[i, 1] = np.sum(sim_pres_rts * t_centers * dt)
+            sim_inc_pres_rts = obs.fractions[1][0, :] / (np.sum(obs.fractions[1][0, :]) * dt)
 
             sns.kdeplot(corr_abs_rts, bw=0.1, shade=True, c='blue', ax=axes[i, 0],
                         label="Data correct absent")
             sns.kdeplot(corr_pres_rts, bw=0.1, shade=True, c='red', ax=axes[i, 0],
                         label="Data correct present")
-            sns.kdeplot(sim_abs_rts, bw=0.1, shade=True, c='purple', ax=axes[i, 0],
-                        label="Sim correct absent")
-            axes[i, 0].fill_between(t_values, sim_abs_rts, color='purple',
+            axes[i, 0].fill_between(t_values, sim_abs_rts, color='purple', alpha=0.5,
                                     label='Sim correct absent')
-            axes[i, 0].fill_between(t_values, sim_pres_rts, color='orange',
+            axes[i, 0].fill_between(t_values, sim_pres_rts, color='orange', alpha=0.5,
                                     label='Sim correct present')
 
             axes[i, 0].legend(loc="upper right")
@@ -140,26 +145,26 @@ class OptAnalysis:
                         label="Data incorrect absent")
             sns.kdeplot(inc_pres_rts, bw=0.1, shade=True, c='red', ax=axes[i, 1],
                         label="Data incorrect present")
-            axes[i, 1].fill_between(t_values, sim_inc_abs_rts, color='purple',
+            axes[i, 1].fill_between(t_values, sim_inc_abs_rts, color='purple', alpha=0.5,
                                     label='Sim incorrect absent')
-            axes[i, 1].fill_between(t_values, sim_inc_pres_rts, color='orange',
+            axes[i, 1].fill_between(t_values, sim_inc_pres_rts, color='orange', alpha=0.5,
                                     label='Sim incorrect present')
 
             axes[i, 1].legend(loc="upper right")
             axes[i, 1].set_title(str(N) + ' incorrect')
             axes[i, 1].set_xlim([0, self.model_params['T']])
 
-            totresp_data = len(corr_abs_rts) + len(corr_pres_rts) +\
-                len(inc_abs_rts) + len(inc_pres_rts)
+            totresp_pres_data = len(corr_pres_rts) + len(inc_pres_rts)
+            totresp_abs_data = len(corr_abs_rts) + len(inc_abs_rts)
 
             bars = axes[i, 2].bar([0, 1, 2, 3, 5, 6, 7, 8],
-                                  [len(corr_abs_rts) / totresp_data,
+                                  [len(corr_abs_rts) / totresp_abs_data,
                                    np.sum(obs.fractions[0][0, :]),
-                                   len(inc_abs_rts) / totresp_data,
+                                   len(inc_abs_rts) / totresp_abs_data,
                                    np.sum(obs.fractions[0][1, :]),
-                                   len(corr_pres_rts) / totresp_data,
+                                   len(corr_pres_rts) / totresp_pres_data,
                                    np.sum(obs.fractions[1][1, :]),
-                                   len(inc_pres_rts) / totresp_data,
+                                   len(inc_pres_rts) / totresp_pres_data,
                                    np.sum(obs.fractions[1][0, :])],
                                   width=1)
             colors = ['blue', 'purple', 'blue', 'purple', 'red', 'orange', 'red', 'orange']
@@ -172,6 +177,26 @@ class OptAnalysis:
             axes[-1, j].set_xlabel('RT (s)')
         axes[2, 2].set_xticklabels(['Correct Absent', 'Incorrect Absent',
                                     'Correct Present', 'Incorrect Present'], rotation=40)
+
+        axes[0, 3].remove()
+        axes[2, 3].remove()
+        N_values = [8, 12, 16]
+        mrt = subject_data.sub_data.query('correct == 1 & dyn == \'Dynamic\'').\
+            groupby(['setsize', 'target']).agg({'rt': 'mean'}).values
+        sems = subject_data.sub_data.query('correct == 1 & dyn == \'Dynamic\'').\
+            groupby(['setsize', 'target']).agg({'rt': 'sem'}).values
+        axes[1, 3].errorbar(N_values, mrt[::2], yerr=sems[::2], color='r', marker='o', lw=2,
+                            label='Data Absent correct')
+        axes[1, 3].plot(N_values, sim_rt_means[:, 0], color='orange', marker='o', lw=2,
+                        label='Sim Absent correct')
+        axes[1, 3].errorbar(N_values, mrt[1::2], yerr=sems[1::2], color='r', marker='^',
+                            linestyle='--', lw=2, label='Data Present correct')
+        axes[1, 3].plot(N_values, sim_rt_means[:, 1], color='orange', marker='^', lw=2,
+                        linestyle='--', label='Sim Present correct')
+
+        axes[1, 3].set_xlim([N_values[0] - 1, N_values[-1] + 1])
+        axes[1, 3].legend(loc='upper right', prop={'size': 6})
+
         fig.suptitle("Subject {} {} optimization, {} fine model, {} reward scheme\n {}".format(
                      self.subject_num, self.opt_type, self.fine_model,
                      self.reward_scheme, optstring), size=24)

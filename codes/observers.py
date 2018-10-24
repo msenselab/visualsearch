@@ -90,7 +90,7 @@ class ObserverSim:
         D_trajectory = np.zeros(int(T / dt))
 
         while t < T:
-            D_t = D_t + np.random.normal(mu[C]*dt, sigma[C]*dt)
+            D_t = D_t + np.random.normal(mu[C] * dt, sigma[C] * dt)
 
             g_t = self.D_to_g(D_t)
             D_trajectory[int(t / dt)] = D_t

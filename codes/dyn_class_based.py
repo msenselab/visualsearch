@@ -26,6 +26,7 @@ savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 gridsearch = True
 
+
 def likelihood_inner_loop(curr_params):
     bellutil = BellmanUtil(**curr_params)
     curr_params['decisions'] = bellutil.decisions
@@ -121,6 +122,7 @@ def modelfit(arglist):
                                           bounds=bnds, n_pre_samples=50)
     else:
         dim_size = int(np.sqrt(num_samples))
+
         def likelihood_for_opt(log_parameters):
             likelihood_arglist = model_type, log_parameters, model_params
             return subject_likelihood(likelihood_arglist)
@@ -146,7 +148,7 @@ def modelfit(arglist):
             x_opt = (log_param_pairs, likelihoods_returned)
 
         if model_type[0] == 'sig_punish':
-            bnds = np.array(((0.1, 1.5), (0.6, 1.5)))  # [n_variables, 2] shaped array with bounds
+            bnds = np.array(((0.1, 1.5), (0.05, 0.8)))  # [n_variables, 2] shaped array with bounds
             log_sigma_list = np.log(np.linspace(bnds[0][0], bnds[0][1], dim_size))
             log_punish_list = np.log(np.linspace(bnds[1][0], bnds[1][1], dim_size))
             log_param_pairs = np.array(list(it.product(log_sigma_list, log_punish_list)))
