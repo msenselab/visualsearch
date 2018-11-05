@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.animation import FuncAnimation, writers
 import seaborn as sns
+import pandas as pd
 from fine_grain_model import FineGrained
 from bellman_utilities import BellmanUtil
 from observers import ObserverSim
@@ -197,6 +198,8 @@ class OptAnalysis:
         axes[1, 3].set_xlim([N_values[0] - 1, N_values[-1] + 1])
         axes[1, 3].legend(loc='upper right', prop={'size': 6})
 
+        self.sim_rt_means = sim_rt_means
+
         fig.suptitle("Subject {} {} optimization, {} fine model, {} reward scheme\n {}".format(
                      self.subject_num, self.opt_type, self.fine_model,
                      self.reward_scheme, optstring), size=24)
@@ -244,12 +247,13 @@ if __name__ == '__main__':
     datapath = Path('~/Documents/fit_data/')
 
     subjects = list(range(1, 12))
-    models = [('sig', 'sym', 'const'),
+    models = [#('sig', 'sym', 'const'),
               ('sig_reward', 'asym_reward', 'const'),
-              ('sig_punish', 'epsilon_punish', 'const'),
-              ('sig', 'sym', 'sqrt'),
-              ('sig_reward', 'asym_reward', 'sqrt'),
-              ('sig_punish', 'epsilon_punish', 'sqrt')]
+              #('sig_punish', 'epsilon_punish', 'const'),
+              #('sig', 'sym', 'sqrt'),
+              #('sig_reward', 'asym_reward', 'sqrt'),
+              #('sig_punish', 'epsilon_punish', 'sqrt')
+              ]
 
     for model in models:
         opt_type, reward_scheme, fine_model = model
@@ -257,7 +261,10 @@ if __name__ == '__main__':
         if not os.path.exists(str(savepath.expanduser())):
             os.mkdir(str(savepath.expanduser()))
 
-        for subject in subjects:
+        all_sim_means_abs = np.zeros((len(subjects), 3))
+        all_sim_means_pres = np.zeros((len(subjects), 3))
+
+        for i, subject in enumerate(subjects):
             filename = './subject_{}_{}_{}_{}_modelfit.p'.format(subject, opt_type,
                                                                  reward_scheme, fine_model)
             try:
@@ -285,5 +292,45 @@ if __name__ == '__main__':
             distfigurepath = savepath.joinpath('subject_{}_{}_{}_{}_bestfit_dist.png'.format(
                                                subject, opt_type, reward_scheme, fine_model))
             fig, ax = curranalysis.plot_opt_fits()
-            plt.savefig(str(distfigurepath.expanduser()), DPI=500)
+            # plt.savefig(str(distfigurepath.expanduser()), DPI=500)
             plt.close()
+
+            all_sim_means_abs[i, :] = curranalysis.sim_rt_means[:, 0]
+            all_sim_means_pres[i, :] = curranalysis.sim_rt_means[:, 1]
+
+        datapath = '../data/'
+        savepath = '../figs/'
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        exp1 = pd.read_csv(datapath + 'exp1.csv', index_col=None)  # read data
+        # .sub is a keyword, change it
+        exp1.rename(columns={'sub': 'subno'}, inplace=True)
+        # filter correct trials, group by factors and average RTs
+        mrt = exp1.query('correct == 1 & dyn == \'Dynamic\'')\
+            .groupby(['subno', 'setsize', 'target'])\
+            .agg({'rt': 'mean'})
+        # visualize it
+        mrt_arr = mrt.values.reshape((11, 3, 2))
+        data_mrts = np.mean(mrt_arr, axis=0)
+        data_rt_stds = np.std(mrt_arr, axis=0)
+
+        sim_sds_pres = np.std(all_sim_means_pres, axis=0)
+        sim_sds_abs = np.std(all_sim_means_abs, axis=0)
+        sim_means_pres = np.mean(all_sim_means_pres, axis=0)
+        sim_means_abs = np.mean(all_sim_means_abs, axis=0)
+
+        ax.errorbar([8, 12, 16], sim_means_abs, yerr=sim_sds_abs, color='orange',
+                    label='sim absent', lw=2, marker='^')
+        ax.errorbar([8, 12, 16], sim_means_pres, yerr=sim_sds_pres, color='purple',
+                    label='sim present', lw=2, marker='^')
+        ax.errorbar([8, 12, 16], data_mrts[:, 0], yerr=data_rt_stds[:, 0], color='green',
+                    label='data absent', lw=2, marker='o')
+        ax.errorbar([8, 12, 16], data_mrts[:, 1], yerr=data_rt_stds[:, 1], color='blue',
+                    label='data present', lw=2, marker='o')
+        ax.set_xlim([7, 17])
+        ax.set_ylim([0, 5])
+        ax.legend()
+        ax.set_xlabel('N stimuli')
+        ax.set_ylabel('RT (s)')
+        ax.set_title('{} {} {} model'.format(*model))
