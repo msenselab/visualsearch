@@ -59,8 +59,8 @@ class FineGrained:
                 pres_samples[j, i] = self._d_map(N, self._sample_epsilon(1, N, sigma_N), sigma_N)
                 abs_samples[j, i] = self._d_map(N, self._sample_epsilon(0, N, sigma_N), sigma_N)
 
-            coarse_stats[i] = np.array([[np.mean(abs_samples), np.sqrt(np.var(abs_samples))],
-                                        [np.mean(pres_samples), np.sqrt(np.var(pres_samples))]])
+            coarse_stats[i] = np.array([[np.mean(abs_samples[:, i]), np.sqrt(np.var(abs_samples[:, i]))],
+                                        [np.mean(pres_samples[:, i]), np.sqrt(np.var(pres_samples[:, i]))]])
 
         self.pres_samples = pres_samples
         self.abs_samples = abs_samples

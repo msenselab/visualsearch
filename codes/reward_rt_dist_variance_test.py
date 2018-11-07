@@ -1,13 +1,13 @@
 import numpy as np
+import os
+import pickle
 from copy import deepcopy
 import multiprocessing as mulpro
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import seaborn as sns
 from fine_grain_model import FineGrained
 from bellman_utilities import BellmanUtil
 from observers import ObserverSim
-from data_and_likelihood import DataLikelihoods
 
 
 def likelihood_inner_loop(curr_params):
@@ -20,7 +20,7 @@ def likelihood_inner_loop(curr_params):
 
 
 fine_sigma = 0.622
-reward_vals = np.linspace(0.9, 1.1, 1000)
+reward_vals = np.linspace(0.7, 1.3, 50)
 
 size = 100
 model_params = {'T': 10,
@@ -37,21 +37,19 @@ model_params = {'T': 10,
                 'reward_scheme': 'asym_reward',
                 'opt_type': 'sig_reward'}
 
-colorvals = sns.cubehelix_palette(reward_vals.shape[0], start=2, rot=0, dark=0, light=.85,
-                                  reverse=True)
-cmap = sns.cubehelix_palette(as_cmap=True, start=2, rot=0, dark=0, light=.85,
-                             reverse=True)
+prescolorvals = sns.color_palette('Blues_d', reward_vals.shape[0])
+abscolorvals = sns.color_palette('Greens_d', reward_vals.shape[0])
+
+pres_cmap = sns.choose_colorbrewer_palette('Blues_d', as_cmap=True)
+abs_cmap = sns.choose_colorbrewer_palette('Greens_d', as_cmap=True)
+
 maxlen = int(model_params['T'] / model_params['dt'])
 
-allfracs = np.zeros((reward_vals.shape[0],  # Store all fractions for each reward value
-                     len(model_params['N_values']),  # Store fractions for each N
-                     2,  # Store fractions across state C in (Abs, Pres)
-                     3,  # Store fractions across choice identity (abs, pres, wait)
-                     maxlen))  # Store across all time steps
-for i, reward in enumerate(reward_vals):
+
+def rewardeval(reward):
     curr_params = deepcopy(model_params)
     curr_params['reward'] = reward
-    print(i)
+    print(np.where(reward_vals == reward)[0][0])
 
     finegr = FineGrained(**curr_params)
     coarse_stats = finegr.coarse_stats
@@ -64,24 +62,79 @@ for i, reward in enumerate(reward_vals):
         N_params['N'] = curr_params['N_values'][j]
         N_blocked_model_params.append(N_params)
 
-    pool = mulpro.Pool(processes=3)
-    dist_computed_params = pool.map(likelihood_inner_loop, N_blocked_model_params)
-    pool.close()
-    pool.join()
+    dist_computed_params = list(map(likelihood_inner_loop, N_blocked_model_params))
 
+    outarr = np.zeros((3, 2, 3, maxlen))
+    boundsarr = np.zeros((3, model_params['size'], maxlen))
     for j in range(len(model_params['N_values'])):
-        allfracs[i, j, 0, :, :] = dist_computed_params[j]['fractions'][0]
-        allfracs[i, j, 1, :, :] = dist_computed_params[j]['fractions'][1]
+        outarr[j, 0, :, :] = dist_computed_params[j]['fractions'][0]
+        outarr[j, 1, :, :] = dist_computed_params[j]['fractions'][1]
+        boundsarr[j, :, :] = dist_computed_params[j]['decisions']
 
-T = model_params['T']
-dt = model_params['dt']
-t_values = np.arange(0, T, dt)
-fig, axes = plt.subplots(2, 2)
-for i in range(reward_vals.shape[0]):
-    axes[0, 0].plot(t_values, allfracs[i, 0, 0, 0, :] / np.sum(allfracs[i, 0, 0, 0, :] * dt),
-                    color=colorvals[i], lw=3, alpha=0.25)
-    axes[1, 0].plot(t_values, allfracs[i, 0, 1, 1, :] / np.sum(allfracs[i, 0, 1, 1, :] * dt),
-                    color=colorvals[i], lw=3, alpha=0.25)
-norm = mpl.colors.Normalize(vmin=reward_vals[0], vmax=reward_vals[-1])
-cb1 = mpl.colorbar.ColorbarBase(axes[0, 1], cmap=cmap, norm=norm, orientation='vertical')
-axes[1, 1].remove()
+    return outarr, boundsarr
+
+
+if __name__ == '__main__':
+    allfracs = np.zeros((reward_vals.shape[0],  # Store all fractions for each reward value
+                         len(model_params['N_values']),  # Store fractions for each N
+                         2,  # Store fractions across state C in (Abs, Pres)
+                         3,  # Store fractions across choice identity (abs, pres, wait)
+                         maxlen))  # Store across all time steps
+    allbounds = np.zeros((reward_vals.shape[0],
+                          len(model_params['N_values']),
+                          model_params['size'],
+                          maxlen))
+    max_processes = 18
+    for firstproc in range(0, reward_vals.shape[0], max_processes):
+        indices = np.arange(firstproc, firstproc + max_processes)
+        indices = indices[indices < reward_vals.shape[0]]
+        pool = mulpro.Pool(processes=max_processes)
+        currevals = pool.map(rewardeval, reward_vals[indices])
+        pool.close()
+        pool.join()
+        for i, (eval, bounds) in enumerate(currevals):
+            allfracs[indices[i], :] = eval
+            allbounds[indices[i], :] = bounds
+
+    fpath = os.path.expanduser('~/Documents/allfracs_{}_finesig_widereward.p'.format(fine_sigma))
+    fw = open(fpath, 'wb')
+    outdict = {'allfracs': allfracs, 'allbounds': allbounds, 'fine_sigma': fine_sigma, 'reward_vals': reward_vals,
+               'model_params': model_params}
+    pickle.dump(outdict, fw)
+    fw.close()
+
+    T = model_params['T']
+    dt = model_params['dt']
+    t_values = np.arange(0, T, dt)
+    t_centers = t_values + (dt / 2)
+
+    upperbounds = np.zeros((reward_vals.shape[0], 3))
+    lowerbounds = np.zeros((reward_vals.shape[0], 3))
+    g_values = model_params['g_values']
+    for i in range(reward_vals.shape[0]):
+        for j in range(len(model_params['N_values'])):
+            curriter
+            upperbounds[i, j] = g_values[np.where(curriter == 2)[0][0]]
+            lowerbounds[i, j] = g_values[np.amax]
+
+    fig, axes = plt.subplots(2, 1)
+    for i in range(reward_vals.shape[0]):
+        axes[0].plot(t_values, allfracs[i, 0, 0, 0, :] / np.sum(allfracs[i, 0, 0, 0, :] * dt),
+                     color=abscolorvals[i], lw=2, alpha=0.25)
+        axes[1].plot(t_values, allfracs[i, 0, 1, 1, :] / np.sum(allfracs[i, 0, 1, 1, :] * dt),
+                     color=prescolorvals[i], lw=2, alpha=0.25)
+    # norm = mpl.colors.Normalize(vmin=reward_vals[0], vmax=reward_vals[-1])
+    # cb1 = mpl.colorbar.ColorbarBase(axes[0, 1], cmap=abs_cmap, norm=norm, orientation='vertical')
+    # axes[0, 1].set_title('Absent colormap')
+    # cb2 = mpl.colorbar.ColorbarBase(axes[1, 1], cmap=pres_cmap, norm=norm, orientation='vertical')
+    # axes[1, 1].set_title('Present colormap')
+
+    sim_rt_means = np.zeros(allfracs.shape[:-1])
+    norm_fracs = np.zeros_like(allfracs)
+    for i in range(reward_vals.shape[0]):
+        for j in range(3):
+            for k in range(2):
+                for l in range(3):
+                    currarr = allfracs[i, j, k, l, :]
+                    norm_fracs[i, j, k, l, :] = currarr / (np.sum(currarr) * dt)
+    sim_rt_means = np.sum(norm_fracs * t_centers * dt, axis=-1)
