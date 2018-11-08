@@ -247,12 +247,12 @@ if __name__ == '__main__':
     datapath = Path('~/Documents/fit_data/')
 
     subjects = list(range(1, 12))
-    models = [#('sig', 'sym', 'const'),
+    models = [('sig', 'sym', 'const'),
               ('sig_reward', 'asym_reward', 'const'),
-              #('sig_punish', 'epsilon_punish', 'const'),
-              #('sig', 'sym', 'sqrt'),
-              #('sig_reward', 'asym_reward', 'sqrt'),
-              #('sig_punish', 'epsilon_punish', 'sqrt')
+              ('sig_punish', 'epsilon_punish', 'const'),
+              ('sig', 'sym', 'sqrt'),
+              ('sig_reward', 'asym_reward', 'sqrt'),
+              ('sig_punish', 'epsilon_punish', 'sqrt')
               ]
 
     for model in models:
@@ -276,34 +276,34 @@ if __name__ == '__main__':
 
             curranalysis = OptAnalysis(**sub_fit)
             # First plot tested likelihoods
-            if sub_fit['opt_type'] == 'sig':
-                fig, ax = curranalysis.plot_likelihoods()
-                figurepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.png'.format(
-                                               subject, opt_type, reward_scheme, fine_model))
-                plt.savefig(str(figurepath.expanduser()), DPI=500)
-                plt.close()
-            else:
-                moviepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.mp4'.format(
-                                              subject, opt_type, reward_scheme, fine_model))
-                curranalysis.save_anim_likelihoods(moviepath)
-                plt.close()
+            # if sub_fit['opt_type'] == 'sig':
+            #     fig, ax = curranalysis.plot_likelihoods()
+            #     figurepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.png'.format(
+            #                                    subject, opt_type, reward_scheme, fine_model))
+            #     plt.savefig(str(figurepath.expanduser()), DPI=500)
+            #     plt.close()
+            # else:
+            #     moviepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.mp4'.format(
+            #                                   subject, opt_type, reward_scheme, fine_model))
+            #     curranalysis.save_anim_likelihoods(moviepath)
+            #     plt.close()
 
             # Now plot distributions of best fit
             distfigurepath = savepath.joinpath('subject_{}_{}_{}_{}_bestfit_dist.png'.format(
                                                subject, opt_type, reward_scheme, fine_model))
             fig, ax = curranalysis.plot_opt_fits()
-            # plt.savefig(str(distfigurepath.expanduser()), DPI=500)
+            plt.savefig(str(distfigurepath.expanduser()), DPI=500)
             plt.close()
 
             all_sim_means_abs[i, :] = curranalysis.sim_rt_means[:, 0]
             all_sim_means_pres[i, :] = curranalysis.sim_rt_means[:, 1]
 
-        datapath = '../data/'
+        expdatapath = '../data/'
         savepath = '../figs/'
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        exp1 = pd.read_csv(datapath + 'exp1.csv', index_col=None)  # read data
+        exp1 = pd.read_csv(expdatapath + 'exp1.csv', index_col=None)  # read data
         # .sub is a keyword, change it
         exp1.rename(columns={'sub': 'subno'}, inplace=True)
         # filter correct trials, group by factors and average RTs
@@ -321,13 +321,13 @@ if __name__ == '__main__':
         sim_means_abs = np.mean(all_sim_means_abs, axis=0)
 
         ax.errorbar([8, 12, 16], sim_means_abs, yerr=sim_sds_abs, color='orange',
-                    label='sim absent', lw=2, marker='^')
+                    label='sim absent', lw=2, marker='^', capsize=5, capthick=2.5)
         ax.errorbar([8, 12, 16], sim_means_pres, yerr=sim_sds_pres, color='purple',
-                    label='sim present', lw=2, marker='^')
+                    label='sim present', lw=2, marker='^', capsize=5, capthick=2.5)
         ax.errorbar([8, 12, 16], data_mrts[:, 0], yerr=data_rt_stds[:, 0], color='green',
-                    label='data absent', lw=2, marker='o')
+                    label='data absent', lw=2, marker='o', capsize=5, capthick=2.5)
         ax.errorbar([8, 12, 16], data_mrts[:, 1], yerr=data_rt_stds[:, 1], color='blue',
-                    label='data present', lw=2, marker='o')
+                    label='data present', lw=2, marker='o', capsize=5, capthick=2.5)
         ax.set_xlim([7, 17])
         ax.set_ylim([0, 5])
         ax.legend()

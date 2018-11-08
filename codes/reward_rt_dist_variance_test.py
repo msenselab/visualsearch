@@ -19,8 +19,8 @@ def likelihood_inner_loop(curr_params):
     return curr_params
 
 
-fine_sigma = 0.622
-reward_vals = np.linspace(0.7, 1.3, 50)
+fine_sigma = 0.669
+reward_vals = np.linspace(0.815, 1., 50)
 
 size = 100
 model_params = {'T': 10,
@@ -35,6 +35,7 @@ model_params = {'T': 10,
                 'punishment': 0,
                 'fine_model': 'const',
                 'reward_scheme': 'asym_reward',
+                'num_samples': 50000,
                 'opt_type': 'sig_reward'}
 
 prescolorvals = sns.color_palette('Blues_d', reward_vals.shape[0])
@@ -98,8 +99,8 @@ if __name__ == '__main__':
 
     fpath = os.path.expanduser('~/Documents/allfracs_{}_finesig_widereward.p'.format(fine_sigma))
     fw = open(fpath, 'wb')
-    outdict = {'allfracs': allfracs, 'allbounds': allbounds, 'fine_sigma': fine_sigma, 'reward_vals': reward_vals,
-               'model_params': model_params}
+    outdict = {'allfracs': allfracs, 'allbounds': allbounds, 'fine_sigma': fine_sigma,
+               'reward_vals': reward_vals, 'model_params': model_params}
     pickle.dump(outdict, fw)
     fw.close()
 
@@ -113,16 +114,44 @@ if __name__ == '__main__':
     g_values = model_params['g_values']
     for i in range(reward_vals.shape[0]):
         for j in range(len(model_params['N_values'])):
-            curriter
-            upperbounds[i, j] = g_values[np.where(curriter == 2)[0][0]]
-            lowerbounds[i, j] = g_values[np.amax]
+            currdecs = allbounds[i, j, :, -1]
+            upperbounds[i, j] = g_values[np.where(currdecs == 2)[0][0]]
+            lowerbounds[i, j] = g_values[np.amax(np.where(currdecs == 1)[0]) + 1]
 
-    fig, axes = plt.subplots(2, 1)
+    N_values = model_params['N_values']
+    plt.figure()
     for i in range(reward_vals.shape[0]):
-        axes[0].plot(t_values, allfracs[i, 0, 0, 0, :] / np.sum(allfracs[i, 0, 0, 0, :] * dt),
-                     color=abscolorvals[i], lw=2, alpha=0.25)
-        axes[1].plot(t_values, allfracs[i, 0, 1, 1, :] / np.sum(allfracs[i, 0, 1, 1, :] * dt),
-                     color=prescolorvals[i], lw=2, alpha=0.25)
+        plt.plot(N_values, upperbounds[i, :], lw=2, color=prescolorvals[i])
+        plt.plot(N_values, lowerbounds[i, :], lw=2, color=abscolorvals[i])
+    plt.xlabel('N stimuli', size=22)
+    plt.xticks(N_values)
+    plt.ylabel(r'$g_t = P(C = 1 | x_{1 \dots t})$', size=22)
+
+    fig, axes = plt.subplots(2, 10, figsize=(28, 8))
+    interval = int(reward_vals.shape[0] / 10)
+    midpoint = int(reward_vals.shape[0] / 2)
+
+    for i, j in enumerate(range(0, reward_vals.shape[0], interval)):
+        axes[0, i].plot(t_values, allfracs[j, 0, 0, 0, :] / np.sum(allfracs[j, 0, 0, 0, :] * dt),
+                        color=abscolorvals[0], lw=2)
+        axes[0, i].plot(t_values, allfracs[j, 1, 0, 0, :] / np.sum(allfracs[j, 1, 0, 0, :] * dt),
+                        color=abscolorvals[midpoint], lw=2)
+        axes[0, i].plot(t_values, allfracs[j, 2, 0, 0, :] / np.sum(allfracs[j, 2, 0, 0, :] * dt),
+                        color=abscolorvals[-1], lw=2)
+        axes[0, i].set_xlim([0, 5])
+        axes[0, i].set_title('reward = {:.3f}'.format(reward_vals[j]))
+
+        axes[1, i].plot(t_values, allfracs[j, 0, 1, 1, :] / np.sum(allfracs[j, 0, 1, 1, :] * dt),
+                        color=abscolorvals[0], lw=2)
+        axes[1, i].plot(t_values, allfracs[j, 1, 1, 1, :] / np.sum(allfracs[j, 1, 1, 1, :] * dt),
+                        color=abscolorvals[midpoint], lw=2)
+        axes[1, i].plot(t_values, allfracs[j, 2, 1, 1, :] / np.sum(allfracs[j, 2, 1, 1, :] * dt),
+                        color=abscolorvals[-1], lw=2)
+        axes[1, i].set_xlim([0, 5])
+        # axes[1, i].set_ylim([0, 1])
+        axes[1, i].set_xlabel('Reaction time (s)')
+
+    plt.tight_layout()
     # norm = mpl.colors.Normalize(vmin=reward_vals[0], vmax=reward_vals[-1])
     # cb1 = mpl.colorbar.ColorbarBase(axes[0, 1], cmap=abs_cmap, norm=norm, orientation='vertical')
     # axes[0, 1].set_title('Absent colormap')

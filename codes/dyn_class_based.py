@@ -175,7 +175,7 @@ if __name__ == '__main__':
         subject_num = 1
         print('No subject number passed at prompt. Setting subject to 1')
 
-    size = 100
+    size = 250
     model_params = {'T': 10,
                     'dt': 0.05,
                     't_w': 0.5,
