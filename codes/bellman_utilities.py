@@ -116,8 +116,8 @@ class BellmanUtil:
         # Backwards induction
         for index in range(2, int(self.T / self.dt) + 1):
             for i in range(self.size):
-                V_wait = np.sum(
-                    prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * self.dt)
+                V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * self.dt)
+
                 # Find the maximum value b/w waiting and two decision options. Store value and ident
                 V_full[i, -index] = np.amax((V_wait,
                                              decision_vals[i, 0], decision_vals[i, 1]))

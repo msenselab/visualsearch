@@ -15,6 +15,8 @@ model_params = {'T': 10,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.7,
+                'reward': 1,
+                'punishment': 0,
                 'fine_model': 'const',
                 'reward_scheme': 'sym',
                 }
@@ -26,6 +28,7 @@ N_values = model_params['N_values']
 dist_computed_params = []
 for i, N in enumerate(N_values):
     curr_params = deepcopy(model_params)
+    curr_params['N'] = N
     curr_params['mu'] = model_params['coarse_stats'][i, :, 0]
     curr_params['sigma'] = model_params['coarse_stats'][i, :, 1]
     bellutil = BellmanUtil(**curr_params)
