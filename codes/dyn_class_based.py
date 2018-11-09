@@ -21,7 +21,7 @@ from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 import pickle
 
-num_samples = 3600
+num_samples = 100
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 gridsearch = True
@@ -128,7 +128,7 @@ def modelfit(arglist):
             return subject_likelihood(likelihood_arglist)
 
         if model_type[0] == 'sig':
-            bnds = np.array(((0.1, 1.5),))
+            bnds = np.array(((1, 5),))
             log_param_list = np.log(np.linspace(bnds[0][0], bnds[0][1], num_samples))
             likelihoods_returned = np.zeros_like(log_param_list)
             for idx, log_param in enumerate(log_param_list):
@@ -175,7 +175,7 @@ if __name__ == '__main__':
         subject_num = 1
         print('No subject number passed at prompt. Setting subject to 1')
 
-    size = 250
+    size = 100
     model_params = {'T': 10,
                     'dt': 0.05,
                     't_w': 0.5,
@@ -183,17 +183,18 @@ if __name__ == '__main__':
                     'lapse': 1e-6,
                     'N_values': (8, 12, 16),
                     'g_values': np.linspace(1e-4, 1 - 1e-4, size),
-                    'subject_num': subject_num,}
+                    'subject_num': subject_num}
 
     print('Subject number {}'.format(subject_num))
 
     model_list = [
+
         ('sig', 'sym', 'const'),
-        ('sig_reward', 'asym_reward', 'const'),
-        #('sig_punish', 'epsilon_punish', 'const'),
+        # ('sig_reward', 'asym_reward', 'const'),
+        # ('sig_punish', 'epsilon_punish', 'const'),
         ('sig', 'sym', 'sqrt'),
-        ('sig_reward', 'asym_reward', 'sqrt'),
-        #('sig_punish', 'epsilon_punish', 'sqrt'),
+        # ('sig_reward', 'asym_reward', 'sqrt'),
+        # ('sig_punish', 'epsilon_punish', 'sqrt'),
         ]
 
     master_arglists = [(model, model_params) for model in model_list]
