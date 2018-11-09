@@ -55,25 +55,29 @@ class FineGrained:
                 sigma_N = fine_sigma * (np.sqrt(N / N_min))
 
             # For present and absent case calculate each decision variable from set of observations
-            for j in range(num_samples):
-                pres_samples[j, i] = self._d_map(N, self._sample_epsilon(1, N, sigma_N), sigma_N)
-                abs_samples[j, i] = self._d_map(N, self._sample_epsilon(0, N, sigma_N), sigma_N)
+            pres_epsilons = self._sample_epsilon(1, N_values[i], sigma_N, num_samples)
+            abs_epsilons = self._sample_epsilon(0, N_values[i], sigma_N, num_samples)
 
-            coarse_stats[i] = np.array([[np.mean(abs_samples[:, i]), np.sqrt(np.var(abs_samples[:, i]))],
-                                        [np.mean(pres_samples[:, i]), np.sqrt(np.var(pres_samples[:, i]))]])
+            pres_samples[:, i] = self._d_map(N, pres_epsilons, sigma_N)
+            abs_samples[:, i] = self._d_map(N, abs_epsilons, sigma_N)
+
+            coarse_stats[i] = np.array([[np.mean(abs_samples[:, i]),
+                                         np.std(abs_samples[:, i])],
+                                        [np.mean(pres_samples[:, i]),
+                                         np.std(pres_samples[:, i])]])
 
         self.pres_samples = pres_samples
         self.abs_samples = abs_samples
         self.coarse_stats = coarse_stats
 
-    def _sample_epsilon(self, C, N, sigma):
+    def _sample_epsilon(self, C, N, sigma, num_samples):
         '''
         Returns an N dimensional vector representing draws of evidence
         from each item in the display in a given condition C
         '''
-        epsilons = np.random.normal(0, sigma, N)
+        epsilons = np.random.normal(0, sigma, (N, num_samples))
         if C == 1:
-            epsilons[0] = np.random.normal(1, sigma)
+            epsilons[0, :] = np.random.normal(1, sigma, num_samples)
         return epsilons
 
     def _d_map(self, N, epsilons, sigma_N):
@@ -82,4 +86,5 @@ class FineGrained:
         between pres and abs conditions, used to bootstrap SDT-like distributions
         in get_coarse_stats function
         '''
-        return -(1 / (2 * sigma_N**2)) + np.log((1 / N) * np.sum(np.exp(epsilons / sigma_N**2)))
+        return -(1 / (2 * sigma_N**2)) + \
+            np.log((1 / N) * np.sum(np.exp(epsilons / sigma_N**2), axis=0))
