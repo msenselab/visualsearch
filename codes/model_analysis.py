@@ -91,7 +91,7 @@ class OptAnalysis:
                 ' reward =' + str(np.exp(optparams[1]))[:5]
         elif self.opt_type == 'sig_punish':
             self.model_params['fine_sigma'] = np.exp(optparams[0])
-            self.model_params['punishment'] = np.exp(optparams[1])
+            self.model_params['punishment'] = - np.exp(optparams[1])
             optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams[0]))[:5] +\
                 ' punishment =' + str(np.exp(optparams[1]))[:5]
         finegr = FineGrained(**self.model_params)

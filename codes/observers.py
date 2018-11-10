@@ -58,7 +58,7 @@ class ObserverSim:
     def p_gtp1_C(self, C, g_t, g_tp1, sigma, mu):
         D_t = self.g_to_D(g_t)
         D_tp1 = self.g_to_D(g_tp1)
-        jacobian_factor = 1 / (self.D_to_g(D_t) * (1 - self.D_to_g(D_t)))
+        jacobian_factor = 1 / (g_t * (1 - g_t))
 
         draw = norm.pdf(D_tp1, D_t + mu[C], sigma[C])
 

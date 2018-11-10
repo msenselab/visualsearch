@@ -21,7 +21,7 @@ from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 import pickle
 
-num_samples = 100
+num_samples = 1600
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 gridsearch = True
@@ -70,7 +70,7 @@ def subject_likelihood(likelihood_arglist):
 
         model_params['fine_sigma'] = fine_sigma
         model_params['reward'] = 1
-        model_params['punishment'] = punishment
+        model_params['punishment'] = - punishment
 
     finegr = FineGrained(**model_params)
     coarse_stats = finegr.coarse_stats
@@ -148,7 +148,7 @@ def modelfit(arglist):
             x_opt = (log_param_pairs, likelihoods_returned)
 
         if model_type[0] == 'sig_punish':
-            bnds = np.array(((0.1, 1.5), (0.05, 0.8)))  # [n_variables, 2] shaped array with bounds
+            bnds = np.array(((0.1, 10), (np.exp(-2), np.exp(-0.5))))
             log_sigma_list = np.log(np.linspace(bnds[0][0], bnds[0][1], dim_size))
             log_punish_list = np.log(np.linspace(bnds[1][0], bnds[1][1], dim_size))
             log_param_pairs = np.array(list(it.product(log_sigma_list, log_punish_list)))
@@ -175,7 +175,7 @@ if __name__ == '__main__':
         subject_num = 1
         print('No subject number passed at prompt. Setting subject to 1')
 
-    size = 100
+    size = 500
     model_params = {'T': 10,
                     'dt': 0.05,
                     't_w': 0.5,
@@ -189,12 +189,12 @@ if __name__ == '__main__':
 
     model_list = [
 
-        ('sig', 'sym', 'const'),
+        # ('sig', 'sym', 'const'),
         # ('sig_reward', 'asym_reward', 'const'),
-        # ('sig_punish', 'epsilon_punish', 'const'),
-        ('sig', 'sym', 'sqrt'),
+        ('sig_punish', 'sym', 'const'),
+        # ('sig', 'sym', 'sqrt'),
         # ('sig_reward', 'asym_reward', 'sqrt'),
-        # ('sig_punish', 'epsilon_punish', 'sqrt'),
+        ('sig_punish', 'sym', 'sqrt'),
         ]
 
     master_arglists = [(model, model_params) for model in model_list]
