@@ -14,7 +14,6 @@ from pathlib import Path
 from copy import deepcopy
 import multiprocess as mulpro
 import itertools as it
-import matplotlib.pyplot as plt
 from gauss_opt import bayesian_optimisation
 from fine_grain_model import FineGrained
 from bellman_utilities import BellmanUtil
@@ -22,10 +21,11 @@ from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 import pickle
 
+presamp = 20
 num_samples = 1000
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
-gridsearch = True
+gridsearch = False
 
 
 def likelihood_inner_loop(curr_params):
@@ -105,7 +105,7 @@ def subject_likelihood(likelihood_arglist):
     pool.join()
 
     if 'failure' in dist_computed_params:
-        return np.inf
+        return 9999
 
     likelihood_data = DataLikelihoods(**model_params)
     for single_N_params in dist_computed_params:
@@ -173,22 +173,22 @@ def modelfit(arglist):
         if model_type[0] == 'sig':
             bnds = np.array(((-1.7, 2.5),))  # [n_variables, 2] shaped array with bounds
             x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                          bounds=bnds, n_pre_samples=50)
+                                          bounds=bnds, n_pre_samples=presamp)
 
         elif model_type[0] == 'sig_reward':
             bnds = np.array(((-1.7, 2.5), (-1., 0.5)))  # [n_variables, 2] shaped array with bounds
             x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                          bounds=bnds, n_pre_samples=50)
+                                          bounds=bnds, n_pre_samples=presamp)
 
         elif model_type[0] == 'sig_punish':
             bnds = np.array(((-1.7, 2.5), (-5., 1.)))  # [n_variables, 2] shaped array with bounds
             x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                          bounds=bnds, n_pre_samples=50)
+                                          bounds=bnds, n_pre_samples=presamp)
 
         elif model_type[0] == 'sig_reward_punish':
             bnds = np.array(((-2.3, 0.2), (-0.7, 0.1), (-0.25, 2.3)))
             x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
-                                          bounds=bnds, n_pre_samples=50)
+                                          bounds=bnds, n_pre_samples=presamp)
 
     else:
         dim_size = int(np.sqrt(num_samples))

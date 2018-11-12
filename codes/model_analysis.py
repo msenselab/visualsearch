@@ -41,6 +41,8 @@ class OptAnalysis:
             self.model_params['punishment'] = 0
         elif opt_type == 'sig_punish':
             self.model_params['reward'] = 1
+        elif opt_type == 'sig_reward_punish':
+            pass
         else:
             raise ValueError('opt_type not in supported set')
 
@@ -94,6 +96,13 @@ class OptAnalysis:
             self.model_params['punishment'] = - np.exp(optparams[1])
             optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams[0]))[:5] +\
                 ' punishment =' + str(np.exp(optparams[1]))[:5]
+        elif self.opt_type == 'sig_reward_punish':
+            self.model_params['fine_sigma'] = np.exp(optparams[0])
+            self.model_params['reward'] = np.exp(optparams[1])
+            self.model_params['punishment'] = - np.exp(optparams[2])
+            optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams[0]))[:5] +\
+                ' reward =' + str(np.exp(optparams[1]))[:5] + ' punish =' +\
+                str(np.exp(optparams[2]))[:5]
         finegr = FineGrained(**self.model_params)
         coarse_stats = finegr.coarse_stats
         subject_data = DataLikelihoods(**self.model_params)
@@ -247,12 +256,13 @@ if __name__ == '__main__':
     datapath = Path('~/Documents/fit_data/')
 
     subjects = list(range(1, 12))
-    models = [('sig', 'sym', 'const'),
-              ('sig_reward', 'asym_reward', 'const'),
-              ('sig_punish', 'sym', 'const'),
-              ('sig_punish', 'sym', 'sqrt'),
-              ('sig', 'sym', 'sqrt'),
-              ('sig_reward', 'asym_reward', 'sqrt'),
+    models = [
+              # ('sig', 'sym', 'const'),
+              ('sig_reward_punish', 'asym_reward', 'const'),
+              # ('sig_punish', 'sym', 'const'),
+              # ('sig_punish', 'sym', 'sqrt'),
+              # ('sig', 'sym', 'sqrt'),
+              ('sig_reward_punish', 'asym_reward', 'sqrt'),
               ]
 
     for model in models:
@@ -276,17 +286,17 @@ if __name__ == '__main__':
 
             curranalysis = OptAnalysis(**sub_fit)
             # First plot tested likelihoods
-            if sub_fit['opt_type'] == 'sig':
-                fig, ax = curranalysis.plot_likelihoods()
-                figurepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.png'.format(
-                                               subject, opt_type, reward_scheme, fine_model))
-                plt.savefig(str(figurepath.expanduser()), DPI=500)
-                plt.close()
-            else:
-                moviepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.mp4'.format(
-                                              subject, opt_type, reward_scheme, fine_model))
-                curranalysis.save_anim_likelihoods(moviepath)
-                plt.close()
+            # if sub_fit['opt_type'] == 'sig':
+            #     fig, ax = curranalysis.plot_likelihoods()
+            #     figurepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.png'.format(
+            #                                    subject, opt_type, reward_scheme, fine_model))
+            #     plt.savefig(str(figurepath.expanduser()), DPI=500)
+            #     plt.close()
+            # else:
+            #     moviepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.mp4'.format(
+            #                                   subject, opt_type, reward_scheme, fine_model))
+            #     curranalysis.save_anim_likelihoods(moviepath)
+            #     plt.close()
 
             # Now plot distributions of best fit
             distfigurepath = savepath.joinpath('subject_{}_{}_{}_{}_bestfit_dist.png'.format(
