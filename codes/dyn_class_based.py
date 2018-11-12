@@ -22,7 +22,7 @@ from observers import ObserverSim
 from data_and_likelihood import DataLikelihoods
 import pickle
 
-num_samples = 64
+num_samples = 1000
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 gridsearch = True
