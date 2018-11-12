@@ -22,7 +22,7 @@ from data_and_likelihood import DataLikelihoods
 import pickle
 
 presamp = 20
-num_samples = 1000
+num_samples = 500
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 gridsearch = False
