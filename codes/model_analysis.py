@@ -140,7 +140,7 @@ class OptAnalysis:
 
             axes[i, 0].legend(loc="upper right")
             axes[i, 0].set_title(str(N) + ' correct')
-            axes[i, 0].set_xlim([0, self.model_params['T']])
+            axes[i, 0].set_xlim([0, 10])
 
             sns.kdeplot(inc_abs_rts, bw=0.1, shade=True, c='blue', ax=axes[i, 1],
                         label="Data incorrect absent")
@@ -153,7 +153,7 @@ class OptAnalysis:
 
             axes[i, 1].legend(loc="upper right")
             axes[i, 1].set_title(str(N) + ' incorrect')
-            axes[i, 1].set_xlim([0, self.model_params['T']])
+            axes[i, 1].set_xlim([0, 10])
 
             totresp_pres_data = len(corr_pres_rts) + len(inc_pres_rts)
             totresp_abs_data = len(corr_abs_rts) + len(inc_abs_rts)
@@ -249,10 +249,10 @@ if __name__ == '__main__':
     subjects = list(range(1, 12))
     models = [('sig', 'sym', 'const'),
               ('sig_reward', 'asym_reward', 'const'),
-              ('sig_punish', 'epsilon_punish', 'const'),
+              ('sig_punish', 'sym', 'const'),
+              ('sig_punish', 'sym', 'sqrt'),
               ('sig', 'sym', 'sqrt'),
               ('sig_reward', 'asym_reward', 'sqrt'),
-              ('sig_punish', 'epsilon_punish', 'sqrt')
               ]
 
     for model in models:
@@ -276,17 +276,17 @@ if __name__ == '__main__':
 
             curranalysis = OptAnalysis(**sub_fit)
             # First plot tested likelihoods
-            # if sub_fit['opt_type'] == 'sig':
-            #     fig, ax = curranalysis.plot_likelihoods()
-            #     figurepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.png'.format(
-            #                                    subject, opt_type, reward_scheme, fine_model))
-            #     plt.savefig(str(figurepath.expanduser()), DPI=500)
-            #     plt.close()
-            # else:
-            #     moviepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.mp4'.format(
-            #                                   subject, opt_type, reward_scheme, fine_model))
-            #     curranalysis.save_anim_likelihoods(moviepath)
-            #     plt.close()
+            if sub_fit['opt_type'] == 'sig':
+                fig, ax = curranalysis.plot_likelihoods()
+                figurepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.png'.format(
+                                               subject, opt_type, reward_scheme, fine_model))
+                plt.savefig(str(figurepath.expanduser()), DPI=500)
+                plt.close()
+            else:
+                moviepath = savepath.joinpath('subject_{}_{}_{}_{}_likelihoods_tested.mp4'.format(
+                                              subject, opt_type, reward_scheme, fine_model))
+                curranalysis.save_anim_likelihoods(moviepath)
+                plt.close()
 
             # Now plot distributions of best fit
             distfigurepath = savepath.joinpath('subject_{}_{}_{}_{}_bestfit_dist.png'.format(

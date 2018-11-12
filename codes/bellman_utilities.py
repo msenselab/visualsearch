@@ -148,16 +148,15 @@ class BellmanUtil:
         This criteria comes from the invariance of policy with
         respect to linear shift in V
         '''
-        def V_in_rho(log_rho):
-            rho = np.exp(log_rho)
+        def V_in_rho(rho):
             values = self.back_induct(reward, punishment, rho, sigma, mu,
                                       prob_grid, reward_scheme)[0]
             return values[int(self.size / 2), 0]
 
         # when optimizing for reward this optimization should be accounted for in choosing bounds
         try:
-            opt_log_rho = brentq(V_in_rho, -10 + np.log(reward), 10 + np.log(reward))
+            rho = brentq(V_in_rho, punishment * (1 / self.t_w), reward * (1 / self.t_w))
         except ValueError:
-            raise Exception("defective bounds in rho finding procedure")
+            raise ValueError("defective bounds in rho finding procedure")
 
-        return np.exp(opt_log_rho)
+        return rho
