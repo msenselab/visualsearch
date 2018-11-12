@@ -221,7 +221,7 @@ def modelfit(arglist):
 
         elif model_type[0] == 'sig_reward_punish':
             dim_size = np.round(num_samples ** (1/3)).astype(int)
-            bnds = np.array([(0.1, 1.2), (0.5, 1.1), (0.8, 10.)])
+            bnds = np.array([(0.1, 1.2), (0.5, 1.1), (0.8, 4.)])
             log_sigma_list = np.log(np.linspace(bnds[0, 0], bnds[0, 1], dim_size))
             log_reward_list = np.log(np.linspace(bnds[1, 0], bnds[1, 1], dim_size))
             log_punish_list = np.log(np.linspace(bnds[2, 0], bnds[2, 1], dim_size))
