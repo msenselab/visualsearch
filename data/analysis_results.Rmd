@@ -1,0 +1,210 @@
+---
+title: "Dynamic search Results"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+```{r include = FALSE}
+source('dyn_data_analysis.R')
+library(BayesFactor)
+```
+
+## Results
+
+### Experiment 1
+
+#### 1.1. Correct RTs from Experiment 1
+
+```{r fig1}
+figRTs$exp1
+```
+
+#### 1.2. RT statistics
+
+```{r exp1rt_st}
+rt_anova$exp1$ANOVA
+```
+
+#### 1.3. Slopes,d' and biases:
+
+```{r figcb1}
+fig_combine$exp1
+```
+
+#### 1.4. ANOVA for the slopes
+
+```{r}
+slope_anova$exp1$ANOVA
+```
+
+The interaction in the slopes was mainly caused by the large slope in the static target-absent condition. We further tested if the slopes in the dynamic conditions were the same or not. 
+
+
+first, confirmation of the original study, 'present' slopes had no difference. 
+```{r}
+a1 = dat$exp1$slope %>% filter(target == 'Present') %>%
+  ezANOVA(data = ., dv = slope, wid = sub, within = dyn)
+a1$ANOVA
+```
+
+
+Bayes Factor:
+```{r}
+dat$exp1$slope$sub <- factor(dat$exp1$slope$sub)
+bf = dat$exp1$slope %>% filter(target == 'Present') %>%
+  anovaBF(slope ~ dyn + sub, whichRandom = "sub", data = .)
+bf
+```
+
+```{r}
+a1 = dat$exp1$slope %>% filter(dyn == 'Dynamic') %>%
+  ezANOVA(data = ., dv = slope, wid = sub, within = target)
+a1$ANOVA
+```
+
+```{r}
+bf = dat$exp1$slope %>% filter(dyn == 'Dynamic') %>%
+  anovaBF(slope ~ target + sub, whichRandom = "sub", data = .)
+bf
+```
+
+#### 1.5 ANOVA for d' and bias C
+
+Search discrimination sensitivity d':
+```{r}
+d_anova$exp1$ANOVA
+```
+
+Search response bias C:
+
+```{r}
+c_anova$exp1$ANOVA
+```
+
+### Experiment 2
+
+#### 2.1. Correct RTs from Experiment 2
+
+```{r fig1}
+figRTs$exp2
+```
+
+#### 2.2. RT statistics
+
+```{r exp1rt_st}
+rt_anova$exp2$ANOVA
+```
+
+#### 2.3. Slopes,d' and biases:
+
+```{r figcb1}
+fig_combine$exp2
+```
+
+#### 2.4. ANOVA for the slopes
+
+```{r}
+slope_anova$exp2$ANOVA
+```
+
+Examine if the slopes in the dynamic search differ between the target absent/present, reward present/absent. 
+
+```{r}
+a21 = dat$exp2$slope %>% filter(dyn == 'Dynamic') %>%
+  ezANOVA(data = ., dv = slope, wid = sub, within = .(target,reward))
+a21$ANOVA
+```
+
+#### 2.5 ANOVA for d' and bias C
+
+Search discrimination sensitivity d':
+```{r}
+d_anova$exp2$ANOVA
+```
+
+Search response bias C:
+
+```{r}
+c_anova$exp2$ANOVA
+```
+
+### Experiment 3
+
+Here is the __former Experiment 5__, with increase difficulity in the search task. 
+
+#### 3.1. Correct RTs from Experiment 3
+
+```{r fig1}
+figRTs$exp5
+```
+
+#### 3.2. RT statistics
+
+```{r exp3rt_st}
+rt_anova$exp5$ANOVA
+```
+
+#### 3.3. Slopes,d' and biases:
+
+```{r figcb5}
+fig_combine$exp5
+```
+
+#### 3.4. ANOVA for the slopes
+
+```{r}
+slope_anova$exp5$ANOVA
+```
+
+We further test if the slope in the dynamic condition was different.
+
+```{r}
+a5 = dat$exp5$slope %>% filter(dyn == 'Dynamic') %>%
+  ezANOVA(data = ., dv = slope, wid = sub, within = target)
+a5$ANOVA
+```
+
+Bayes Factor:
+```{r}
+dat$exp5$slope$sub <- factor(dat$exp5$slope$sub)
+bf = dat$exp5$slope %>% filter(dyn == 'Dynamic') %>%
+  anovaBF(slope ~ target + sub, whichRandom = "sub", data = .)
+bf
+```
+
+
+and the 'present' slopes between the dynamic and static displays
+```{r}
+a6 = dat$exp5$slope %>% filter(target == 'Present') %>%
+  ezANOVA(data = ., dv = slope, wid = sub, within = dyn)
+a6$ANOVA
+```
+
+Bayes Factor:
+```{r}
+bf = dat$exp5$slope %>% filter(target == 'Present') %>%
+  anovaBF(slope ~ dyn + sub, whichRandom = "sub", data = .)
+bf
+```
+
+#### 3.5 ANOVA for d' and bias C
+
+Search discrimination sensitivity d':
+```{r}
+d_anova$exp5$ANOVA
+```
+
+Search response bias C:
+
+```{r}
+c_anova$exp5$ANOVA
+```
+
+See if the 'dynamic' search had neutral response. 
+
+== Todo: test if the C in the dynamic conditions differ from 0 ==
+
