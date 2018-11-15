@@ -1,13 +1,8 @@
 import numpy as np
-from copy import deepcopy
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from pathlib import Path
-from fine_grain_model import FineGrained
-from bellman_utilities import BellmanUtil
-from observers import ObserverSim
-from data_and_likelihood import DataLikelihoods
 from example_model_implementation import run_model
 
 datapath = Path('../data/')
@@ -32,7 +27,7 @@ model_params = {'T': 30,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
-                'reward': 0.567,
+                'reward': 0.57,
                 'punishment': -2.29,
                 'fine_model': 'sqrt',
                 'reward_scheme': 'asym_reward',
@@ -124,7 +119,7 @@ model_params = {'T': 30,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
-                'reward': 0.567 * increase_factor,
+                'reward': 0.57 * increase_factor,
                 'punishment': -2.29,
                 'fine_model': 'sqrt',
                 'reward_scheme': 'asym_reward',
@@ -183,16 +178,11 @@ axes[1, 1].set_xticks([8, 12, 16])
 axes[1, 1].set_xlabel('N Stimuli')
 axes[1, 1].set_ylabel('Mean error rate')
 
-exp2mrt = exp2.query('correct == 1 & dyn == \'Dynamic\' & reward == \'Absent\'')\
+exp2mrt_abs = exp2.query('correct == 1 & dyn == \'Dynamic\' & reward == \'Absent\'')\
     .groupby(['subno', 'dyn', 'setsize', 'target']).agg({'rt': 'mean'}).reset_index()
-sns.catplot(x='setsize', y='rt', hue='target', data=exp2mrt, kind='point', ax=axes[0, 2])
+sns.catplot(x='setsize', y='rt', hue='target', data=exp2mrt_abs, kind='point', ax=axes[0, 2])
 plt.close()
 axes[0, 2].set_title('Absent-rewarded subject data')
-
-exp2mrt_abs_allsubs = np.array(exp2mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'mean'}))
-exp2mrt_abs_allsubs = exp2mrt_abs_allsubs.reshape(3, -1)
-exp2sem_abs_allsubs = np.array(exp2mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'sem'}))
-exp2sem_abs_allsubs = exp2sem_abs_allsubs.reshape(3, -1)
 
 exp2arr = np.array(exp2.query('dyn == \'Dynamic\' & reward == \'Absent\''))
 sub_error_rates = np.zeros((3, 2, 11))
@@ -253,7 +243,7 @@ model_params = {'T': 30,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
-                'reward': 0.567 * (1 / increase_factor),
+                'reward': 0.57 * (1 / increase_factor),
                 'punishment': -2.29 * (1 / increase_factor),
                 'fine_model': 'sqrt',
                 'reward_scheme': 'asym_reward',
@@ -312,17 +302,12 @@ axes[1, 1].set_xticks([8, 12, 16])
 axes[1, 1].set_xlabel('N Stimuli')
 axes[1, 1].set_ylabel('Mean error rate')
 
-exp2mrt = exp2.query('correct == 1 & dyn == \'Dynamic\' & reward == \'Present\'')\
+exp2mrt_pres = exp2.query('correct == 1 & dyn == \'Dynamic\' & reward == \'Present\'')\
     .groupby(['subno', 'dyn', 'setsize', 'target']).agg({'rt': 'mean'}).reset_index()
-sns.catplot(x='setsize', y='rt', hue='target', data=exp2mrt, kind='point', ax=axes[0, 2])
+
+sns.catplot(x='setsize', y='rt', hue='target', data=exp2mrt_pres, kind='point', ax=axes[0, 2])
 plt.close()
 axes[0, 2].set_title('Present-rewarded subject data')
-
-exp2mrt_pres_allsubs = np.array(exp2mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'mean'}))
-exp2mrt_pres_allsubs = exp2mrt_pres_allsubs.reshape(3, -1)
-exp2sem_pres_allsubs = np.array(exp2mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'sem'}))
-exp2sem_pres_allsubs = exp2sem_pres_allsubs.reshape(3, -1)
-
 
 exp2arr = np.array(exp2.query('dyn == \'Dynamic\' & reward == \'Present\''))
 sub_error_rates = np.zeros((3, 2, 11))
@@ -371,45 +356,65 @@ plt.suptitle('Experiment 2: Explicit reward on Present correct')
 ####
 # Summary of differences in mean RT
 ####
-absR_diff_SEMs = np.sqrt(exp1sem_allsubs ** 2 + exp2sem_abs_allsubs ** 2)
-presR_diff_SEMs = np.sqrt(exp1sem_allsubs ** 2 + exp2sem_pres_allsubs ** 2)
-fig, axes = plt.subplots(2, 2, figsize=(12, 12),
+exp1arr_mrts = np.array(exp1mrt.rt).reshape(11, 3, 2)
+exp1arr_diffs = exp1arr_mrts[:, :, 0] - exp1arr_mrts[:, :, 1]
+exp1arr_diffmean = np.mean(exp1arr_diffs)
+exp1arr_diffSEMs = np.std(exp1arr_diffs, axis=0) / np.sqrt(exp1arr_diffs.shape[0])
+exp1arr_overallSEM = np.sqrt(np.sum(exp1arr_diffSEMs ** 2))
+
+exp2arr_abs_mrts = np.array(exp2mrt_abs.rt).reshape(12, 3, 2)
+exp2arr_abs_diffs = exp2arr_abs_mrts[:, :, 0] - exp2arr_abs_mrts[:, :, 1]
+exp2arr_abs_diffmean = np.mean(exp2arr_abs_diffs)
+exp2arr_abs_diffSEMs = np.std(exp2arr_abs_diffs, axis=0) / np.sqrt(exp2arr_abs_diffs.shape[0])
+exp2arr_abs_overallSEM = np.sqrt(np.sum(exp2arr_abs_diffSEMs ** 2))
+
+exp2arr_pres_mrts = np.array(exp2mrt_pres.rt).reshape(12, 3, 2)
+exp2arr_pres_diffs = exp2arr_pres_mrts[:, :, 0] - exp2arr_pres_mrts[:, :, 1]
+exp2arr_pres_diffmean = np.mean(exp2arr_pres_diffs)
+exp2arr_pres_diffSEMs = np.std(exp2arr_pres_diffs, axis=0) / np.sqrt(exp2arr_pres_diffs.shape[0])
+exp2arr_pres_overallSEM = np.sqrt(np.sum(exp2arr_pres_diffSEMs ** 2))
+
+fig, axes = plt.subplots(1, 1, figsize=(7, 7),
                          sharex=True, sharey=True)  # columns: rewarded C, rows: disp cond C
-axes[0, 0].bar([8, 12, 16], -ref_sim_mean_rts[:, 0] + absR_sim_mean_rts[:, 0], width=-1.8,
-               edgecolor='blue', color='white', linestyle='--', linewidth=2, label='Sim')
-axes[0, 0].bar([8, 12, 16], -exp1mrt_allsubs[:, 0] + exp2mrt_abs_allsubs[:, 0], width=1.8,
-               yerr=absR_diff_SEMs[:, 0], edgecolor='blue', color='white', linewidth=2,
-               label='Data', error_kw=dict(ecolor='blue', lw=2, capsize=15, capthick=2))
-axes[0, 0].set_title('Mean absent RT change\nCorrect Abs response rewarded')
-axes[0, 0].legend(loc='upper left')
+sim_absR_curvediff_delta = (-ref_sim_mean_rts[:, 0] + absR_sim_mean_rts[:, 0]
+                            + ref_sim_mean_rts[:, 1] - absR_sim_mean_rts[:, 1])
+sim_absR_mean_delta = np.mean(sim_absR_curvediff_delta)
+data_absR_mean_delta = exp2arr_abs_diffmean - exp1arr_diffmean
+data_absR_delta_SEM = np.sqrt(exp1arr_overallSEM ** 2 + exp2arr_abs_overallSEM ** 2)
+axes.bar(1, sim_absR_mean_delta, width=-0.8,
+         edgecolor='blue', color='white', linestyle='--', linewidth=2, label='Sim')
+axes.bar(1, data_absR_mean_delta, width=0.8,
+         yerr=data_absR_delta_SEM, edgecolor='blue', color='white', linewidth=2,
+         label='Data', error_kw=dict(ecolor='blue', lw=2, capsize=10, capthick=2))
+axes.set_title('Change in difference between Abs, Pres mean')
+axes.legend(loc='upper left')
+axes.set_xlabel('N stimuli', size=18)
+axes.set_ylabel('Change in RT difference $\Delta(\mu_{abs} - \mu_{pres})$ (s)', size=18)
 
-axes[1, 0].bar([8, 12, 16], -ref_sim_mean_rts[:, 1] + absR_sim_mean_rts[:, 1], width=-1.8,
-               edgecolor='green', color='white', linestyle='--', linewidth=2)
-axes[1, 0].bar([8, 12, 16], -exp1mrt_allsubs[:, 1] + exp2mrt_abs_allsubs[:, 1], width=1.8,
-               yerr=absR_diff_SEMs[:, 1], edgecolor='green', color='white', linewidth=2,
-               error_kw=dict(ecolor='green', lw=2, capsize=15, capthick=2))
-axes[1, 0].set_title('Mean present RT change\nCorrect Abs response rewarded')
+sim_presR_curvediff_delta = (-ref_sim_mean_rts[:, 0] + presR_sim_mean_rts[:, 0]
+                             + ref_sim_mean_rts[:, 1] - presR_sim_mean_rts[:, 1])
+sim_presR_mean_delta = np.mean(sim_presR_curvediff_delta)
+data_presR_mean_delta = exp2arr_pres_diffmean - exp1arr_diffmean
+data_presR_delta_SEM = np.sqrt(exp1arr_overallSEM ** 2 + exp2arr_pres_overallSEM ** 2)
+axes.bar(3, sim_presR_mean_delta, width=-0.8,
+         edgecolor='green', color='white', linestyle='--', linewidth=2)
+axes.bar(3, data_presR_mean_delta, width=0.8,
+         yerr=data_presR_delta_SEM, edgecolor='green', color='white', linewidth=2,
+         error_kw=dict(ecolor='green', lw=2, capsize=10, capthick=2))
+axes.set_xticks([1, 3])
+axes.set_xticklabels(['Absent Reward', 'Present Reward'])
+axes.set_title('Change in difference between Abs, Pres mean')
+axes.legend(loc='upper left')
+axes.set_xlabel('N stimuli', size=18)
+axes.set_ylabel('Change in RT difference $\Delta(\mu_{abs} - \mu_{pres})$ (s)', size=18)
 
-axes[0, 1].bar([8, 12, 16], -ref_sim_mean_rts[:, 0] + presR_sim_mean_rts[:, 0], width=-1.8,
-               edgecolor='blue', color='white', linestyle='--', linewidth=2)
-axes[0, 1].bar([8, 12, 16], -exp1mrt_allsubs[:, 0] + exp2mrt_pres_allsubs[:, 0], width=1.8,
-               yerr=presR_diff_SEMs[:, 0], edgecolor='blue', color='white', linewidth=2,
-               error_kw=dict(ecolor='blue', lw=2, capsize=15, capthick=2))
-axes[0, 1].set_title('Mean absent RT change\nCorrect Pres response rewarded')
-
-axes[1, 1].bar([8, 12, 16], -ref_sim_mean_rts[:, 1] + presR_sim_mean_rts[:, 1], width=-1.8,
-               edgecolor='green', color='white', linestyle='--', linewidth=2)
-axes[1, 1].bar([8, 12, 16], -exp1mrt_allsubs[:, 1] + exp2mrt_pres_allsubs[:, 1], width=1.8,
-               yerr=presR_diff_SEMs[:, 1], edgecolor='green', color='white', linewidth=2,
-               error_kw=dict(ecolor='green', lw=2, capsize=15, capthick=2))
-axes[1, 1].set_title('Mean present RT change\nCorrect Pres response rewarded')
 
 ##############################
 #           EXP5             #
 # Increased task difficulty  #
 ##############################
 size = 250
-increase_factor = (4 / 3)
+increase_factor = (10 / 9)
 model_params = {'T': 30,
                 'dt': 0.05,
                 't_w': 0.5,
@@ -419,7 +424,7 @@ model_params = {'T': 30,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8 * increase_factor,
-                'reward': 0.567,
+                'reward': 0.57,
                 'punishment': -2.29,
                 'fine_model': 'sqrt',
                 'reward_scheme': 'asym_reward',
@@ -484,12 +489,18 @@ sns.catplot(x='setsize', y='rt', hue='target', data=exp5mrt, kind='point', ax=ax
 plt.close()
 axes[0, 2].set_title('Increased-difficulty subject data')
 
+exp5mrt_allsubs = np.array(exp5mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'mean'}))
+exp5mrt_allsubs = exp5mrt_allsubs.reshape(3, -1)
+exp5sem_allsubs = np.array(exp5mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'sem'}))
+exp5sem_allsubs = exp5sem_allsubs.reshape(3, -1)
+
+
 exp5arr = np.array(exp5.query('dyn == \'Dynamic\''))
 sub_error_rates = np.zeros((3, 2, 11))
 for subject in range(1, 12):
     for i, N in enumerate([8, 12, 16]):
         for j, C in enumerate(('Absent', 'Present')):
-            filt = (exp5arr[:, 0] == C) & (exp5arr[:, 1] == N) & (exp5arr[:, 5] == subject)
+            filt = (exp5arr[:, 1] == C) & (exp5arr[:, 2] == N) & (exp5arr[:, 7] == subject)
             sub_error_rates[i, j, subject - 1] = (np.sum((exp5arr[filt][:, -1] == 0)) /
                                                   len(exp5arr[filt]))
 
@@ -529,3 +540,23 @@ axes[1, 3].set_xticks([8, 12, 16])
 axes[1, 3].set_xlabel('N Stimuli')
 axes[1, 3].set_ylabel('Mean error rate')
 plt.suptitle('Experiment 5: Increased task difficulty')
+
+incnoise_diff_SEMs = np.sqrt(exp1sem_allsubs ** 2 + exp5sem_allsubs ** 2)
+incnoise_full_SEM = np.sqrt(np.sum(incnoise_diff_SEMs ** 2, axis=0))
+fig, axes = plt.subplots(1, 1, figsize=(7, 7),
+                         sharex=True, sharey=True)  # columns: rewarded C, rows: disp cond C
+axes.bar(1, np.mean(-ref_sim_mean_rts[:, 0] + sim_mean_rts[:, 0]), width=-.8,
+         edgecolor='blue', color='white', linestyle='--', linewidth=2, label='Sim')
+axes.bar(1, np.mean(-exp1mrt_allsubs[:, 0] + exp5mrt_allsubs[:, 0]), width=.8,
+         yerr=incnoise_full_SEM[0], edgecolor='blue', color='white', linewidth=2,
+         label='Data', error_kw=dict(ecolor='blue', lw=2, capsize=15, capthick=2))
+axes.bar(3, np.mean(-ref_sim_mean_rts[:, 1] + sim_mean_rts[:, 1]), width=-.8,
+         edgecolor='green', color='white', linestyle='--', linewidth=2)
+axes.bar(3, np.mean(-exp1mrt_allsubs[:, 1] + exp5mrt_allsubs[:, 1]), width=.8,
+         yerr=incnoise_full_SEM[1], edgecolor='green', color='white', linewidth=2,
+         error_kw=dict(ecolor='green', lw=2, capsize=15, capthick=2))
+axes.set_title('Mean RT change\n' + r'$\mu_{\sigma_{large}} - \mu_{\sigma_{small}}$', size=18)
+axes.set_xticks([1, 3])
+axes.set_xticklabels(['Target Absent', 'Target Present'])
+axes.set_xlabel('')
+axes.set_ylabel('$\Delta \mu_{RT}$', size=18)
