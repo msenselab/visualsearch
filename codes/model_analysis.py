@@ -205,7 +205,9 @@ class OptAnalysis:
                         linestyle='--', label='Sim Present correct')
 
         axes[1, 3].set_xlim([N_values[0] - 1, N_values[-1] + 1])
-        axes[1, 3].legend(loc='upper right', prop={'size': 6})
+        axes[1, 3].set_xlabel('N stimuli')
+        axes[1, 3].set_xticks([8, 12, 16])
+        axes[1, 3].set_ylabel('Mean RT (s)')
 
         self.sim_rt_means = sim_rt_means
 

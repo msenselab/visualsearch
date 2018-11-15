@@ -27,10 +27,11 @@ model_params = {'T': 30,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
-                'reward': 0.57,
-                'punishment': -2.29,
+                'reward': 0.72,
+                'punishment': -2.75,
                 'fine_model': 'sqrt',
                 'reward_scheme': 'asym_reward',
+                'num_samples': 100000,
                 }
 T = model_params['T']
 dt = model_params['dt']
@@ -119,10 +120,11 @@ model_params = {'T': 30,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
-                'reward': 0.57 * increase_factor,
-                'punishment': -2.29,
+                'reward': 0.72 * increase_factor,
+                'punishment': -2.75,
                 'fine_model': 'sqrt',
                 'reward_scheme': 'asym_reward',
+                'num_samples': 100000,
                 }
 T = model_params['T']
 dt = model_params['dt']
@@ -243,10 +245,11 @@ model_params = {'T': 30,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
-                'reward': 0.57 * (1 / increase_factor),
-                'punishment': -2.29 * (1 / increase_factor),
+                'reward': 0.72 * (1 / increase_factor),
+                'punishment': -2.75 * (1 / increase_factor),
                 'fine_model': 'sqrt',
                 'reward_scheme': 'asym_reward',
+                'num_samples': 100000,
                 }
 T = model_params['T']
 dt = model_params['dt']
@@ -374,7 +377,7 @@ exp2arr_pres_diffmean = np.mean(exp2arr_pres_diffs)
 exp2arr_pres_diffSEMs = np.std(exp2arr_pres_diffs, axis=0) / np.sqrt(exp2arr_pres_diffs.shape[0])
 exp2arr_pres_overallSEM = np.sqrt(np.sum(exp2arr_pres_diffSEMs ** 2))
 
-fig, axes = plt.subplots(1, 1, figsize=(7, 7),
+fig, axes = plt.subplots(1, 1, figsize=(5.5, 5.5),
                          sharex=True, sharey=True)  # columns: rewarded C, rows: disp cond C
 sim_absR_curvediff_delta = (-ref_sim_mean_rts[:, 0] + absR_sim_mean_rts[:, 0]
                             + ref_sim_mean_rts[:, 1] - absR_sim_mean_rts[:, 1])
@@ -388,8 +391,7 @@ axes.bar(1, data_absR_mean_delta, width=0.8,
          label='Data', error_kw=dict(ecolor='blue', lw=2, capsize=10, capthick=2))
 axes.set_title('Change in difference between Abs, Pres mean')
 axes.legend(loc='upper left')
-axes.set_xlabel('N stimuli', size=18)
-axes.set_ylabel('Change in RT difference $\Delta(\mu_{abs} - \mu_{pres})$ (s)', size=18)
+axes.set_ylabel('Change in RT difference $\Delta(\mu_{abs} - \mu_{pres})$ (s)', size=12)
 
 sim_presR_curvediff_delta = (-ref_sim_mean_rts[:, 0] + presR_sim_mean_rts[:, 0]
                              + ref_sim_mean_rts[:, 1] - presR_sim_mean_rts[:, 1])
@@ -402,11 +404,10 @@ axes.bar(3, data_presR_mean_delta, width=0.8,
          yerr=data_presR_delta_SEM, edgecolor='green', color='white', linewidth=2,
          error_kw=dict(ecolor='green', lw=2, capsize=10, capthick=2))
 axes.set_xticks([1, 3])
-axes.set_xticklabels(['Absent Reward', 'Present Reward'])
+axes.set_xticklabels(['Absent Reward', 'Present Reward'], size=12)
 axes.set_title('Change in difference between Abs, Pres mean')
 axes.legend(loc='upper left')
-axes.set_xlabel('N stimuli', size=18)
-axes.set_ylabel('Change in RT difference $\Delta(\mu_{abs} - \mu_{pres})$ (s)', size=18)
+axes.set_ylabel('Change in RT difference $\Delta(\mu_{abs} - \mu_{pres})$ (s)', size=12)
 
 
 ##############################
@@ -424,10 +425,11 @@ model_params = {'T': 30,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8 * increase_factor,
-                'reward': 0.57,
-                'punishment': -2.29,
+                'reward': 0.72,
+                'punishment': -2.75,
                 'fine_model': 'sqrt',
                 'reward_scheme': 'asym_reward',
+                'num_samples': 100000,
                 }
 T = model_params['T']
 dt = model_params['dt']
@@ -543,7 +545,7 @@ plt.suptitle('Experiment 5: Increased task difficulty')
 
 incnoise_diff_SEMs = np.sqrt(exp1sem_allsubs ** 2 + exp5sem_allsubs ** 2)
 incnoise_full_SEM = np.sqrt(np.sum(incnoise_diff_SEMs ** 2, axis=0))
-fig, axes = plt.subplots(1, 1, figsize=(7, 7),
+fig, axes = plt.subplots(1, 1, figsize=(5.5, 5.5),
                          sharex=True, sharey=True)  # columns: rewarded C, rows: disp cond C
 axes.bar(1, np.mean(-ref_sim_mean_rts[:, 0] + sim_mean_rts[:, 0]), width=-.8,
          edgecolor='blue', color='white', linestyle='--', linewidth=2, label='Sim')
@@ -555,8 +557,9 @@ axes.bar(3, np.mean(-ref_sim_mean_rts[:, 1] + sim_mean_rts[:, 1]), width=-.8,
 axes.bar(3, np.mean(-exp1mrt_allsubs[:, 1] + exp5mrt_allsubs[:, 1]), width=.8,
          yerr=incnoise_full_SEM[1], edgecolor='green', color='white', linewidth=2,
          error_kw=dict(ecolor='green', lw=2, capsize=15, capthick=2))
-axes.set_title('Mean RT change\n' + r'$\mu_{\sigma_{large}} - \mu_{\sigma_{small}}$', size=18)
+axes.set_title('Mean RT change\n' + r'$\mu_{\sigma_{large}} - \mu_{\sigma_{small}}$', size=15)
 axes.set_xticks([1, 3])
-axes.set_xticklabels(['Target Absent', 'Target Present'])
+axes.set_xticklabels(['Target Absent', 'Target Present'], size=15)
 axes.set_xlabel('')
-axes.set_ylabel('$\Delta \mu_{RT}$', size=18)
+axes.set_ylabel('$\Delta \mu_{RT}$', size=15)
+plt.tight_layout()
