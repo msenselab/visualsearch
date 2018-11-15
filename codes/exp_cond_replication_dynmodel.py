@@ -17,6 +17,8 @@ exp2 = pd.read_csv(str(datapath.joinpath('exp2.csv').resolve()), index_col=None)
 exp2.rename(columns={'sub': 'subno'}, inplace=True)
 exp3 = pd.read_csv(str(datapath.joinpath('exp3.csv').resolve()), index_col=None)
 exp3.rename(columns={'sub': 'subno'}, inplace=True)
+exp5 = pd.read_csv(str(datapath.joinpath('exp5.csv').resolve()), index_col=None)
+exp5.rename(columns={'sub': 'subno'}, inplace=True)
 
 
 # Run the reference model and plot to compare against exp1
@@ -26,7 +28,7 @@ model_params = {'T': 30,
                 't_w': 0.5,
                 'size': size,
                 'lapse': 1e-6,
-                'N_values': (8, 12, 16),
+                'N_values': [8, 12, 16],
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
@@ -65,9 +67,9 @@ axes[0, 0].set_xlabel('N stimuli')
 axes[0, 0].set_ylabel('Mean reaction time (s)')
 axes[0, 0].set_title('Simulation')
 
-axes[1, 0].bar((8, 12, 16), ref_sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
+axes[1, 0].bar([8, 12, 16], ref_sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
                linewidth=2)
-axes[1, 0].bar((8, 12, 16), ref_sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
+axes[1, 0].bar([8, 12, 16], ref_sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
                linewidth=2)
 axes[1, 0].set_xticks([8, 12, 16])
 axes[1, 0].set_xlabel('N Stimuli')
@@ -80,10 +82,15 @@ plt.close()
 axes[0, 1].set_ylim(axes[0, 0].get_ylim())
 axes[0, 1].set_title('Aggregated subject data')
 
+exp1mrt_allsubs = np.array(exp1mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'mean'}))
+exp1mrt_allsubs = exp1mrt_allsubs.reshape(3, -1)
+exp1sem_allsubs = np.array(exp1mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'sem'}))
+exp1sem_allsubs = exp1sem_allsubs.reshape(3, -1)
+
 exp1arr = np.array(exp1.query('dyn == \'Dynamic\''))
 sub_error_rates = np.zeros((3, 2, 11))
 for subject in range(1, 12):
-    for i, N in enumerate((8, 12, 16)):
+    for i, N in enumerate([8, 12, 16]):
         for j, C in enumerate(('Absent', 'Present')):
             filt = (exp1arr[:, 0] == C) & (exp1arr[:, 1] == N) & (exp1arr[:, 5] == subject)
             sub_error_rates[i, j, subject - 1] = (np.sum((exp1arr[filt][:, -1] == 0)) /
@@ -91,9 +98,9 @@ for subject in range(1, 12):
 
 mean_sub_error_rates = np.mean(sub_error_rates, axis=-1)
 sem_sub_error_rates = np.std(sub_error_rates, axis=-1) / np.sqrt(sub_error_rates.shape[-1])
-axes[1, 1].bar((8, 12, 16), mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
+axes[1, 1].bar([8, 12, 16], mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
                edgecolor='blue', color='white', width=-1.8, linewidth=2, capsize=10)
-axes[1, 1].bar((8, 12, 16), mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
+axes[1, 1].bar([8, 12, 16], mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
                edgecolor='green', color='white', width=1.8, linewidth=2, capsize=10)
 axes[1, 1].set_xticks([8, 12, 16])
 axes[1, 1].set_xlabel('N Stimuli')
@@ -113,7 +120,7 @@ model_params = {'T': 30,
                 't_w': 0.5,
                 'size': size,
                 'lapse': 1e-6,
-                'N_values': (8, 12, 16),
+                'N_values': [8, 12, 16],
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
@@ -129,7 +136,7 @@ N_values = model_params['N_values']
 
 dist_computed_params = run_model(model_params)
 
-sim_mean_rts = np.zeros((3, 2))
+absR_sim_mean_rts = np.zeros((3, 2))
 sim_error_rates = np.zeros((3, 2))
 for i, N in enumerate(N_values):
     currfracs = dist_computed_params[i]['fractions']
@@ -139,8 +146,8 @@ for i, N in enumerate(N_values):
     curr_pres_normed = currfracs[1][1, :] / np.sum(currfracs[1][1, :] * dt)
     curr_pres_mean = np.sum(curr_pres_normed * t_values * dt)
     curr_incorr_during_pres = np.sum(currfracs[1][0, :])
-    sim_mean_rts[i, 0] = curr_abs_mean
-    sim_mean_rts[i, 1] = curr_pres_mean
+    absR_sim_mean_rts[i, 0] = curr_abs_mean
+    absR_sim_mean_rts[i, 1] = curr_pres_mean
     sim_error_rates[i, 0] = curr_incorr_during_abs
     sim_error_rates[i, 1] = curr_incorr_during_pres
 
@@ -153,24 +160,24 @@ axes[0, 0].set_xlabel('N stimuli')
 axes[0, 0].set_ylabel('Mean reaction time (s)')
 axes[0, 0].set_title('Original Simulation')
 
-axes[1, 0].bar((8, 12, 16), ref_sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
+axes[1, 0].bar([8, 12, 16], ref_sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
                linewidth=2)
-axes[1, 0].bar((8, 12, 16), ref_sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
+axes[1, 0].bar([8, 12, 16], ref_sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
                linewidth=2)
 axes[1, 0].set_xticks([8, 12, 16])
 axes[1, 0].set_xlabel('N Stimuli')
 axes[1, 0].set_ylabel('Mean error rate')
 
-axes[0, 1].plot(N_values, sim_mean_rts[:, 0], lw=2, color='blue', marker='o', ms=10)
-axes[0, 1].plot(N_values, sim_mean_rts[:, 1], lw=2, ls='--', color='green', marker='o', ms=10)
+axes[0, 1].plot(N_values, absR_sim_mean_rts[:, 0], lw=2, color='blue', marker='o', ms=10)
+axes[0, 1].plot(N_values, absR_sim_mean_rts[:, 1], lw=2, ls='--', color='green', marker='o', ms=10)
 axes[0, 1].set_xlim([7, 17])
 axes[0, 1].set_xlabel('N stimuli')
 axes[0, 1].set_ylabel('Mean reaction time (s)')
 axes[0, 1].set_title('Abs-reward Simulation')
 
-axes[1, 1].bar((8, 12, 16), sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
+axes[1, 1].bar([8, 12, 16], sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
                linewidth=2)
-axes[1, 1].bar((8, 12, 16), sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
+axes[1, 1].bar([8, 12, 16], sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
                linewidth=2)
 axes[1, 1].set_xticks([8, 12, 16])
 axes[1, 1].set_xlabel('N Stimuli')
@@ -182,10 +189,15 @@ sns.catplot(x='setsize', y='rt', hue='target', data=exp2mrt, kind='point', ax=ax
 plt.close()
 axes[0, 2].set_title('Absent-rewarded subject data')
 
+exp2mrt_abs_allsubs = np.array(exp2mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'mean'}))
+exp2mrt_abs_allsubs = exp2mrt_abs_allsubs.reshape(3, -1)
+exp2sem_abs_allsubs = np.array(exp2mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'sem'}))
+exp2sem_abs_allsubs = exp2sem_abs_allsubs.reshape(3, -1)
+
 exp2arr = np.array(exp2.query('dyn == \'Dynamic\' & reward == \'Absent\''))
 sub_error_rates = np.zeros((3, 2, 11))
 for subject in range(1, 12):
-    for i, N in enumerate((8, 12, 16)):
+    for i, N in enumerate([8, 12, 16]):
         for j, C in enumerate(('Absent', 'Present')):
             filt = (exp2arr[:, 0] == C) & (exp2arr[:, 1] == N) & (exp2arr[:, 5] == subject)
             sub_error_rates[i, j, subject - 1] = (np.sum((exp2arr[filt][:, -1] == 0)) /
@@ -193,16 +205,14 @@ for subject in range(1, 12):
 
 mean_sub_error_rates = np.mean(sub_error_rates, axis=-1)
 sem_sub_error_rates = np.std(sub_error_rates, axis=-1) / np.sqrt(sub_error_rates.shape[-1])
-axes[1, 2].bar((8, 12, 16), mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
+axes[1, 2].bar([8, 12, 16], mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
                edgecolor='blue', color='white', width=-1.8, linewidth=2, capsize=10)
-axes[1, 2].bar((8, 12, 16), mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
+axes[1, 2].bar([8, 12, 16], mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
                edgecolor='green', color='white', width=1.8, linewidth=2, capsize=10)
 axes[1, 2].set_xticks([8, 12, 16])
 axes[1, 2].set_xlabel('N Stimuli')
 axes[1, 2].set_ylabel('Mean error rate')
 
-exp1mrt = exp1.query('correct == 1 & dyn == \'Dynamic\'')\
-    .groupby(['subno', 'dyn', 'setsize', 'target']).agg({'rt': 'mean'}).reset_index()
 sns.catplot(x='setsize', y='rt', hue='target', data=exp1mrt, kind='point', ax=axes[0, 3])
 plt.close()
 axes[0, 3].set_ylim(axes[0, 0].get_ylim())
@@ -211,7 +221,7 @@ axes[0, 3].set_title('Reference subject data')
 exp1arr = np.array(exp1.query('dyn == \'Dynamic\''))
 sub_error_rates = np.zeros((3, 2, 11))
 for subject in range(1, 12):
-    for i, N in enumerate((8, 12, 16)):
+    for i, N in enumerate([8, 12, 16]):
         for j, C in enumerate(('Absent', 'Present')):
             filt = (exp1arr[:, 0] == C) & (exp1arr[:, 1] == N) & (exp1arr[:, 5] == subject)
             sub_error_rates[i, j, subject - 1] = (np.sum((exp1arr[filt][:, -1] == 0)) /
@@ -219,9 +229,9 @@ for subject in range(1, 12):
 
 mean_sub_error_rates = np.mean(sub_error_rates, axis=-1)
 sem_sub_error_rates = np.std(sub_error_rates, axis=-1) / np.sqrt(sub_error_rates.shape[-1])
-axes[1, 3].bar((8, 12, 16), mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
+axes[1, 3].bar([8, 12, 16], mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
                edgecolor='blue', color='white', width=-1.8, linewidth=2, capsize=10)
-axes[1, 3].bar((8, 12, 16), mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
+axes[1, 3].bar([8, 12, 16], mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
                edgecolor='green', color='white', width=1.8, linewidth=2, capsize=10)
 axes[1, 3].set_xticks([8, 12, 16])
 axes[1, 3].set_xlabel('N Stimuli')
@@ -239,7 +249,7 @@ model_params = {'T': 30,
                 't_w': 0.5,
                 'size': size,
                 'lapse': 1e-6,
-                'N_values': (8, 12, 16),
+                'N_values': [8, 12, 16],
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8,
@@ -255,7 +265,7 @@ N_values = model_params['N_values']
 
 dist_computed_params = run_model(model_params)
 
-sim_mean_rts = np.zeros((3, 2))
+presR_sim_mean_rts = np.zeros((3, 2))
 sim_error_rates = np.zeros((3, 2))
 for i, N in enumerate(N_values):
     currfracs = dist_computed_params[i]['fractions']
@@ -265,8 +275,8 @@ for i, N in enumerate(N_values):
     curr_pres_normed = currfracs[1][1, :] / np.sum(currfracs[1][1, :] * dt)
     curr_pres_mean = np.sum(curr_pres_normed * t_values * dt)
     curr_incorr_during_pres = np.sum(currfracs[1][0, :])
-    sim_mean_rts[i, 0] = curr_abs_mean
-    sim_mean_rts[i, 1] = curr_pres_mean
+    presR_sim_mean_rts[i, 0] = curr_abs_mean
+    presR_sim_mean_rts[i, 1] = curr_pres_mean
     sim_error_rates[i, 0] = curr_incorr_during_abs
     sim_error_rates[i, 1] = curr_incorr_during_pres
 
@@ -279,24 +289,24 @@ axes[0, 0].set_xlabel('N stimuli')
 axes[0, 0].set_ylabel('Mean reaction time (s)')
 axes[0, 0].set_title('Original Simulation')
 
-axes[1, 0].bar((8, 12, 16), ref_sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
+axes[1, 0].bar([8, 12, 16], ref_sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
                linewidth=2)
-axes[1, 0].bar((8, 12, 16), ref_sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
+axes[1, 0].bar([8, 12, 16], ref_sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
                linewidth=2)
 axes[1, 0].set_xticks([8, 12, 16])
 axes[1, 0].set_xlabel('N Stimuli')
 axes[1, 0].set_ylabel('Mean error rate')
 
-axes[0, 1].plot(N_values, sim_mean_rts[:, 0], lw=2, color='blue', marker='o', ms=10)
-axes[0, 1].plot(N_values, sim_mean_rts[:, 1], lw=2, ls='--', color='green', marker='o', ms=10)
+axes[0, 1].plot(N_values, presR_sim_mean_rts[:, 0], lw=2, color='blue', marker='o', ms=10)
+axes[0, 1].plot(N_values, presR_sim_mean_rts[:, 1], lw=2, ls='--', color='green', marker='o', ms=10)
 axes[0, 1].set_xlim([7, 17])
 axes[0, 1].set_xlabel('N stimuli')
 axes[0, 1].set_ylabel('Mean reaction time (s)')
 axes[0, 1].set_title('Pres-reward Simulation')
 
-axes[1, 1].bar((8, 12, 16), sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
+axes[1, 1].bar([8, 12, 16], sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
                linewidth=2)
-axes[1, 1].bar((8, 12, 16), sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
+axes[1, 1].bar([8, 12, 16], sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
                linewidth=2)
 axes[1, 1].set_xticks([8, 12, 16])
 axes[1, 1].set_xlabel('N Stimuli')
@@ -308,10 +318,16 @@ sns.catplot(x='setsize', y='rt', hue='target', data=exp2mrt, kind='point', ax=ax
 plt.close()
 axes[0, 2].set_title('Present-rewarded subject data')
 
+exp2mrt_pres_allsubs = np.array(exp2mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'mean'}))
+exp2mrt_pres_allsubs = exp2mrt_pres_allsubs.reshape(3, -1)
+exp2sem_pres_allsubs = np.array(exp2mrt.groupby(['dyn', 'setsize', 'target']).agg({'rt': 'sem'}))
+exp2sem_pres_allsubs = exp2sem_pres_allsubs.reshape(3, -1)
+
+
 exp2arr = np.array(exp2.query('dyn == \'Dynamic\' & reward == \'Present\''))
 sub_error_rates = np.zeros((3, 2, 11))
 for subject in range(1, 12):
-    for i, N in enumerate((8, 12, 16)):
+    for i, N in enumerate([8, 12, 16]):
         for j, C in enumerate(('Absent', 'Present')):
             filt = (exp2arr[:, 0] == C) & (exp2arr[:, 1] == N) & (exp2arr[:, 5] == subject)
             sub_error_rates[i, j, subject - 1] = (np.sum((exp2arr[filt][:, -1] == 0)) /
@@ -319,16 +335,14 @@ for subject in range(1, 12):
 
 mean_sub_error_rates = np.mean(sub_error_rates, axis=-1)
 sem_sub_error_rates = np.std(sub_error_rates, axis=-1) / np.sqrt(sub_error_rates.shape[-1])
-axes[1, 2].bar((8, 12, 16), mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
+axes[1, 2].bar([8, 12, 16], mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
                edgecolor='blue', color='white', width=-1.8, linewidth=2, capsize=10)
-axes[1, 2].bar((8, 12, 16), mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
+axes[1, 2].bar([8, 12, 16], mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
                edgecolor='green', color='white', width=1.8, linewidth=2, capsize=10)
 axes[1, 2].set_xticks([8, 12, 16])
 axes[1, 2].set_xlabel('N Stimuli')
 axes[1, 2].set_ylabel('Mean error rate')
 
-exp1mrt = exp1.query('correct == 1 & dyn == \'Dynamic\'')\
-    .groupby(['subno', 'dyn', 'setsize', 'target']).agg({'rt': 'mean'}).reset_index()
 sns.catplot(x='setsize', y='rt', hue='target', data=exp1mrt, kind='point', ax=axes[0, 3])
 plt.close()
 axes[0, 3].set_ylim(axes[0, 0].get_ylim())
@@ -337,7 +351,7 @@ axes[0, 3].set_title('Reference subject data')
 exp1arr = np.array(exp1.query('dyn == \'Dynamic\''))
 sub_error_rates = np.zeros((3, 2, 11))
 for subject in range(1, 12):
-    for i, N in enumerate((8, 12, 16)):
+    for i, N in enumerate([8, 12, 16]):
         for j, C in enumerate(('Absent', 'Present')):
             filt = (exp1arr[:, 0] == C) & (exp1arr[:, 1] == N) & (exp1arr[:, 5] == subject)
             sub_error_rates[i, j, subject - 1] = (np.sum((exp1arr[filt][:, -1] == 0)) /
@@ -345,19 +359,54 @@ for subject in range(1, 12):
 
 mean_sub_error_rates = np.mean(sub_error_rates, axis=-1)
 sem_sub_error_rates = np.std(sub_error_rates, axis=-1) / np.sqrt(sub_error_rates.shape[-1])
-axes[1, 3].bar((8, 12, 16), mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
+axes[1, 3].bar([8, 12, 16], mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
                edgecolor='blue', color='white', width=-1.8, linewidth=2, capsize=10)
-axes[1, 3].bar((8, 12, 16), mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
+axes[1, 3].bar([8, 12, 16], mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
                edgecolor='green', color='white', width=1.8, linewidth=2, capsize=10)
 axes[1, 3].set_xticks([8, 12, 16])
 axes[1, 3].set_xlabel('N Stimuli')
 axes[1, 3].set_ylabel('Mean error rate')
 plt.suptitle('Experiment 2: Explicit reward on Present correct')
 
+####
+# Summary of differences in mean RT
+####
+absR_diff_SEMs = np.sqrt(exp1sem_allsubs ** 2 + exp2sem_abs_allsubs ** 2)
+presR_diff_SEMs = np.sqrt(exp1sem_allsubs ** 2 + exp2sem_pres_allsubs ** 2)
+fig, axes = plt.subplots(2, 2, figsize=(12, 12),
+                         sharex=True, sharey=True)  # columns: rewarded C, rows: disp cond C
+axes[0, 0].bar([8, 12, 16], -ref_sim_mean_rts[:, 0] + absR_sim_mean_rts[:, 0], width=-1.8,
+               edgecolor='blue', color='white', linestyle='--', linewidth=2, label='Sim')
+axes[0, 0].bar([8, 12, 16], -exp1mrt_allsubs[:, 0] + exp2mrt_abs_allsubs[:, 0], width=1.8,
+               yerr=absR_diff_SEMs[:, 0], edgecolor='blue', color='white', linewidth=2,
+               label='Data', error_kw=dict(ecolor='blue', lw=2, capsize=15, capthick=2))
+axes[0, 0].set_title('Mean absent RT change\nCorrect Abs response rewarded')
+axes[0, 0].legend(loc='upper left')
+
+axes[1, 0].bar([8, 12, 16], -ref_sim_mean_rts[:, 1] + absR_sim_mean_rts[:, 1], width=-1.8,
+               edgecolor='green', color='white', linestyle='--', linewidth=2)
+axes[1, 0].bar([8, 12, 16], -exp1mrt_allsubs[:, 1] + exp2mrt_abs_allsubs[:, 1], width=1.8,
+               yerr=absR_diff_SEMs[:, 1], edgecolor='green', color='white', linewidth=2,
+               error_kw=dict(ecolor='green', lw=2, capsize=15, capthick=2))
+axes[1, 0].set_title('Mean present RT change\nCorrect Abs response rewarded')
+
+axes[0, 1].bar([8, 12, 16], -ref_sim_mean_rts[:, 0] + presR_sim_mean_rts[:, 0], width=-1.8,
+               edgecolor='blue', color='white', linestyle='--', linewidth=2)
+axes[0, 1].bar([8, 12, 16], -exp1mrt_allsubs[:, 0] + exp2mrt_pres_allsubs[:, 0], width=1.8,
+               yerr=presR_diff_SEMs[:, 0], edgecolor='blue', color='white', linewidth=2,
+               error_kw=dict(ecolor='blue', lw=2, capsize=15, capthick=2))
+axes[0, 1].set_title('Mean absent RT change\nCorrect Pres response rewarded')
+
+axes[1, 1].bar([8, 12, 16], -ref_sim_mean_rts[:, 1] + presR_sim_mean_rts[:, 1], width=-1.8,
+               edgecolor='green', color='white', linestyle='--', linewidth=2)
+axes[1, 1].bar([8, 12, 16], -exp1mrt_allsubs[:, 1] + exp2mrt_pres_allsubs[:, 1], width=1.8,
+               yerr=presR_diff_SEMs[:, 1], edgecolor='green', color='white', linewidth=2,
+               error_kw=dict(ecolor='green', lw=2, capsize=15, capthick=2))
+axes[1, 1].set_title('Mean present RT change\nCorrect Pres response rewarded')
 
 ##############################
-#           EXP2             #
-# Increased pres reward case #
+#           EXP5             #
+# Increased task difficulty  #
 ##############################
 size = 250
 increase_factor = (4 / 3)
@@ -366,7 +415,7 @@ model_params = {'T': 30,
                 't_w': 0.5,
                 'size': size,
                 'lapse': 1e-6,
-                'N_values': (8, 12, 16),
+                'N_values': [8, 12, 16],
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': 1,
                 'fine_sigma': 0.8 * increase_factor,
@@ -406,9 +455,9 @@ axes[0, 0].set_xlabel('N stimuli')
 axes[0, 0].set_ylabel('Mean reaction time (s)')
 axes[0, 0].set_title('Original Simulation')
 
-axes[1, 0].bar((8, 12, 16), ref_sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
+axes[1, 0].bar([8, 12, 16], ref_sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
                linewidth=2)
-axes[1, 0].bar((8, 12, 16), ref_sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
+axes[1, 0].bar([8, 12, 16], ref_sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
                linewidth=2)
 axes[1, 0].set_xticks([8, 12, 16])
 axes[1, 0].set_xlabel('N Stimuli')
@@ -419,36 +468,36 @@ axes[0, 1].plot(N_values, sim_mean_rts[:, 1], lw=2, ls='--', color='green', mark
 axes[0, 1].set_xlim([7, 17])
 axes[0, 1].set_xlabel('N stimuli')
 axes[0, 1].set_ylabel('Mean reaction time (s)')
-axes[0, 1].set_title('Pres-reward Simulation')
+axes[0, 1].set_title('Increased noise simulation')
 
-axes[1, 1].bar((8, 12, 16), sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
+axes[1, 1].bar([8, 12, 16], sim_error_rates[:, 0], edgecolor='blue', color='white', width=-1.8,
                linewidth=2)
-axes[1, 1].bar((8, 12, 16), sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
+axes[1, 1].bar([8, 12, 16], sim_error_rates[:, 1], edgecolor='green', color='white', width=1.8,
                linewidth=2)
 axes[1, 1].set_xticks([8, 12, 16])
 axes[1, 1].set_xlabel('N Stimuli')
 axes[1, 1].set_ylabel('Mean error rate')
 
-exp3mrt = exp3.query('correct == 1 & dyn == \'Dynamic\'')\
+exp5mrt = exp5.query('correct == 1 & dyn == \'Dynamic\'')\
     .groupby(['subno', 'dyn', 'setsize', 'target']).agg({'rt': 'mean'}).reset_index()
-sns.catplot(x='setsize', y='rt', hue='target', data=exp3mrt, kind='point', ax=axes[0, 2])
+sns.catplot(x='setsize', y='rt', hue='target', data=exp5mrt, kind='point', ax=axes[0, 2])
 plt.close()
-axes[0, 2].set_title('Present-rewarded subject data')
+axes[0, 2].set_title('Increased-difficulty subject data')
 
-exp3arr = np.array(exp3.query('dyn == \'Dynamic\''))
+exp5arr = np.array(exp5.query('dyn == \'Dynamic\''))
 sub_error_rates = np.zeros((3, 2, 11))
 for subject in range(1, 12):
-    for i, N in enumerate((8, 12, 16)):
+    for i, N in enumerate([8, 12, 16]):
         for j, C in enumerate(('Absent', 'Present')):
-            filt = (exp3arr[:, 0] == C) & (exp3arr[:, 1] == N) & (exp3arr[:, 5] == subject)
-            sub_error_rates[i, j, subject - 1] = (np.sum((exp3arr[filt][:, -1] == 0)) /
-                                                  len(exp3arr[filt]))
+            filt = (exp5arr[:, 0] == C) & (exp5arr[:, 1] == N) & (exp5arr[:, 5] == subject)
+            sub_error_rates[i, j, subject - 1] = (np.sum((exp5arr[filt][:, -1] == 0)) /
+                                                  len(exp5arr[filt]))
 
 mean_sub_error_rates = np.mean(sub_error_rates, axis=-1)
 sem_sub_error_rates = np.std(sub_error_rates, axis=-1) / np.sqrt(sub_error_rates.shape[-1])
-axes[1, 2].bar((8, 12, 16), mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
+axes[1, 2].bar([8, 12, 16], mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
                edgecolor='blue', color='white', width=-1.8, linewidth=2, capsize=10)
-axes[1, 2].bar((8, 12, 16), mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
+axes[1, 2].bar([8, 12, 16], mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
                edgecolor='green', color='white', width=1.8, linewidth=2, capsize=10)
 axes[1, 2].set_xticks([8, 12, 16])
 axes[1, 2].set_xlabel('N Stimuli')
@@ -464,7 +513,7 @@ axes[0, 3].set_title('Reference subject data')
 exp1arr = np.array(exp1.query('dyn == \'Dynamic\''))
 sub_error_rates = np.zeros((3, 2, 11))
 for subject in range(1, 12):
-    for i, N in enumerate((8, 12, 16)):
+    for i, N in enumerate([8, 12, 16]):
         for j, C in enumerate(('Absent', 'Present')):
             filt = (exp1arr[:, 0] == C) & (exp1arr[:, 1] == N) & (exp1arr[:, 5] == subject)
             sub_error_rates[i, j, subject - 1] = (np.sum((exp1arr[filt][:, -1] == 0)) /
@@ -472,11 +521,11 @@ for subject in range(1, 12):
 
 mean_sub_error_rates = np.mean(sub_error_rates, axis=-1)
 sem_sub_error_rates = np.std(sub_error_rates, axis=-1) / np.sqrt(sub_error_rates.shape[-1])
-axes[1, 3].bar((8, 12, 16), mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
+axes[1, 3].bar([8, 12, 16], mean_sub_error_rates[:, 0], yerr=sem_sub_error_rates[:, 0],
                edgecolor='blue', color='white', width=-1.8, linewidth=2, capsize=10)
-axes[1, 3].bar((8, 12, 16), mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
+axes[1, 3].bar([8, 12, 16], mean_sub_error_rates[:, 1], yerr=sem_sub_error_rates[:, 0],
                edgecolor='green', color='white', width=1.8, linewidth=2, capsize=10)
 axes[1, 3].set_xticks([8, 12, 16])
 axes[1, 3].set_xlabel('N Stimuli')
 axes[1, 3].set_ylabel('Mean error rate')
-plt.suptitle('Experiment 2: Explicit reward on Present correct')
+plt.suptitle('Experiment 5: Increased task difficulty')
