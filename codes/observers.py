@@ -3,7 +3,7 @@ from scipy.stats import uniform, gaussian_kde, norm
 
 
 class ObserverSim:
-    def __init__(self, T, dt, g_values, sigma, mu, decisions, simulate=False, numsims=5000,
+    def __init__(self, T, dt, t_delay, g_values, sigma, mu, decisions, simulate=False, numsims=5000,
                  **kwargs):
         """
         Generates a pool of observers and, given decision bounds, produces simulated reaction times
@@ -32,7 +32,7 @@ class ObserverSim:
             presence_list = [0] * numsims + [1] * numsims
             observer_responses = []
             for C in presence_list:
-                observer_responses.append(self.simulate_observer(T, dt, g_values, mu,
+                observer_responses.append(self.simulate_observer(T, dt, t_delay, g_values, mu,
                                                                  sigma, decisions, C))
 
             response_info = np.array([(x[0], x[1]) for x in observer_responses])
@@ -75,7 +75,7 @@ class ObserverSim:
 
         return prob_grid
 
-    def simulate_observer(self, T, dt, g_values, mu, sigma, decisions, C):
+    def simulate_observer(self, T, dt, t_delay, g_values, mu, sigma, decisions, C):
         if C != 1 and C != 0:
             raise ValueError('condition C must be 0 (abs) or 1 (pres)')
 
@@ -98,10 +98,10 @@ class ObserverSim:
             t += dt
 
             if g_t < abs_bound:
-                return (0, t, g_trajectory, D_trajectory)
+                return (0, t + t_delay, g_trajectory, D_trajectory)
 
             if g_t > pres_bound:
-                return (1, t, g_trajectory, D_trajectory)
+                return (1, t + t_delay, g_trajectory, D_trajectory)
 
         # Return NaN if end of trial reached with no decision
         return (np.NaN, T, g_trajectory, D_trajectory)

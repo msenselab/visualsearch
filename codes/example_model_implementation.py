@@ -32,6 +32,7 @@ if __name__ == '__main__':
     model_params = {'T': 10,
                     'dt': 0.05,
                     't_w': 0.5,
+                    't_delay': 0.2,
                     'size': size,
                     'lapse': 1e-6,
                     'N_values': (8, 12, 16),

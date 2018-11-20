@@ -4,7 +4,7 @@ import numpy as np
 
 
 class BellmanUtil:
-    def __init__(self, T, dt, t_w, size, reward, punishment, sigma, mu,
+    def __init__(self, T, dt, t_w, t_delay, size, reward, punishment, sigma, mu,
                  reward_scheme, **kwargs):
         """
         Solves for rho and performs backward induction through bellman eqs to find value over time
@@ -36,6 +36,7 @@ class BellmanUtil:
         """
         self.T = T
         self.t_w = t_w
+        self.t_delay = t_delay
         self.size = size
         self.dt = dt
         self.g_values = np.linspace(1e-4, 1 - 1e-4, self.size)
@@ -99,11 +100,12 @@ class BellmanUtil:
         # Decision values are static for a given g_t and independent of t. We compute these
         # in advance
         # N x 2 matrix. First column is resp. abs, second is pres.
+        t_total = self.t_w + self.t_delay
         decision_vals = np.zeros((self.size, 2))
         decision_vals[:, 1] = self.g_values * R[1, 1] + \
-            (1 - self.g_values) * R[1, 0] - (self.t_w * rho)  # resp pres
+            (1 - self.g_values) * R[1, 0] - (t_total * rho)  # resp pres
         decision_vals[:, 0] = (1 - self.g_values) * R[0, 0] + \
-            self.g_values * R[0, 1] - (self.t_w * rho)  # resp abs
+            self.g_values * R[0, 1] - (t_total * rho)  # resp abs
 
         # Create array to store V for each g_t at each t. N x (T / dt)
         V_full = np.zeros((self.size, int(self.T / self.dt)))

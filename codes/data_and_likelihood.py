@@ -26,7 +26,7 @@ class DataLikelihoods:
         self.sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
         self.likelihood = 0.
 
-    def increment_likelihood(self, fractions, T, dt, N, reward, lapse, **kwargs):
+    def increment_likelihood(self, fractions, T, t_max, dt, t_delay, N, reward, lapse, **kwargs):
         """
         Increments internal likelihood with the likelihood of given dists and rts
 
@@ -46,14 +46,16 @@ class DataLikelihoods:
         """
         N_data = self.sub_data.query('setsize == {}'.format(N))
         temp = np.mean(np.array(N_data['rt']))
-        t_values = np.arange(0, T, dt)
+        t_values = np.arange(0, T, dt) + t_delay
+        t_values = np.concatenate(([0], t_values))
         d_eval = 1e-4
         evalpoints = np.arange(0, t_values[-1], d_eval)
         normfactors = np.zeros((2, 3))
         likelihood_funcs = np.zeros((2, 3), dtype=object)
         for condition in (0, 1):
             for response in (0, 1, 2):
-                curr_func = interp1d(t_values, fractions[condition][response, :])
+                curr_fracs = np.concatenate(([0], fractions[condition][response, :]))
+                curr_func = interp1d(t_values, curr_fracs)
                 likelihood_funcs[condition, response] = curr_func
                 normfactors[condition, response] = np.sum(curr_func(evalpoints)) * d_eval
 
