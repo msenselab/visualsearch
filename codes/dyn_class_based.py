@@ -255,6 +255,7 @@ if __name__ == '__main__':
                     'dt': 0.05,
                     't_w': 0.5,
                     't_delay': 0.2,
+                    't_max': 5.,
                     'size': size,
                     'lapse': 1e-6,
                     'N_values': (8, 12, 16),
