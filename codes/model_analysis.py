@@ -12,11 +12,13 @@ from data_and_likelihood import DataLikelihoods
 
 
 class OptAnalysis:
-    def __init__(self, subject_num, T, dt, t_w, size, lapse, N_values, g_values, fine_model,
-                 reward_scheme, opt_type, tested_params, likelihoods_returned, **kwargs):
+    def __init__(self, subject_num, T, dt, t_w, size, lapse, N_values, g_values,
+                 fine_model, reward_scheme, opt_type, tested_params, likelihoods_returned,
+                 t_delay=0.0001, **kwargs):
         self.model_params = {'T': T,
                              'dt': dt,
                              't_w': t_w,
+                             't_delay': t_delay,
                              'size': size,
                              'lapse': lapse,
                              'N_values': N_values,

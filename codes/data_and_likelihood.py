@@ -46,41 +46,50 @@ class DataLikelihoods:
         """
         N_data = self.sub_data.query('setsize == {}'.format(N))
         temp = np.mean(np.array(N_data['rt']))
-        t_values = np.arange(0, T, dt) + t_delay
-        t_values = np.concatenate(([0], t_values))
+        t_values = np.arange(0, t_max, dt)
         d_eval = 1e-4
+        max_ind = np.round(t_max / dt).astype(int)
         evalpoints = np.arange(0, t_values[-1], d_eval)
-        normfactors = np.zeros((2, 3))
-        likelihood_funcs = np.zeros((2, 3), dtype=object)
+        normfactors = np.zeros((2, 2))
+        likelihood_funcs = np.zeros((2, 2), dtype=object)
         for condition in (0, 1):
-            for response in (0, 1, 2):
-                curr_fracs = np.concatenate(([0], fractions[condition][response, :]))
+            for response in (0, 1):
+                curr_fracs = fractions[condition][response, :max_ind]
                 curr_func = interp1d(t_values, curr_fracs)
                 likelihood_funcs[condition, response] = curr_func
                 normfactors[condition, response] = np.sum(curr_func(evalpoints)) * d_eval
 
-        subj_rts = np.zeros((2, 2), dtype=object)
+        subj_rts = np.zeros((2, 3), dtype=object)
         subj_rts[0, 0] = N_data.query('resp == 2 & target == \'Absent\'').rt.values
         subj_rts[0, 1] = N_data.query('resp == 1 & target == \'Absent\'').rt.values
+        abs_timeouts = len(N_data.query('resp == -1 & target == \'Absent\'').rt.values)
+        abs_timeouts = np.array([abs_timeouts])
 
         subj_rts[1, 0] = N_data.query('resp == 2 & target == \'Present\'').rt.values
         subj_rts[1, 1] = N_data.query('resp == 1 & target == \'Present\'').rt.values
+        pres_timeouts = len(N_data.query('resp == -1 & target == \'Present\'').rt.values)
+        pres_timeouts = np.array([pres_timeouts])
 
         with np.errstate(divide='ignore', invalid='ignore'):
             subj_rt_likelihoods = np.zeros((2, 2), dtype=object)
             for c in (0, 1):
                 for r in (0, 1):
-                    subj_rt_likelihoods[c, r] = likelihood_funcs[c, r](subj_rts[c, r]) / normfactors[c, r]
+                    subj_rt_likelihoods[c, r] = (likelihood_funcs[c, r](subj_rts[c, r]) /
+                                                 normfactors[c, r])
 
-            log_like_abs = np.concatenate((np.log(np.sum(fractions[0][0, :])) +
+            log_like_abs = np.concatenate((np.log(np.sum(fractions[0][0, :max_ind])) +
                                            np.log(subj_rt_likelihoods[0, 0]),
-                                           np.log(np.sum(fractions[0][1, :])) +
-                                           np.log(subj_rt_likelihoods[0, 1])))
+                                           np.log(np.sum(fractions[0][1, :max_ind])) +
+                                           np.log(subj_rt_likelihoods[0, 1]),
+                                           np.log(fractions[0][2, max_ind - 1]) +
+                                           np.log(abs_timeouts)))
 
-            log_like_pres = np.concatenate((np.log(np.sum(fractions[1][0, :])) +
+            log_like_pres = np.concatenate((np.log(np.sum(fractions[1][0, :max_ind])) +
                                             np.log(subj_rt_likelihoods[1, 0]),
-                                            np.log(np.sum(fractions[1][1, :])) +
-                                            np.log(subj_rt_likelihoods[1, 1])))
+                                            np.log(np.sum(fractions[1][1, :max_ind])) +
+                                            np.log(subj_rt_likelihoods[1, 1]),
+                                            np.log(fractions[1][2, max_ind - 1]) +
+                                            np.log(pres_timeouts)))
 
         log_like_all = np.concatenate((log_like_pres, log_like_abs))
 
