@@ -29,10 +29,8 @@ gridsearch = False
 
 
 def likelihood_inner_loop(curr_params):
-    try:
-        bellutil = BellmanUtil(**curr_params)
-    except ValueError:
-        return 'failure'
+    bellutil = BellmanUtil(**curr_params)
+    curr_params['rho'] = bellutil.rho
     curr_params['decisions'] = bellutil.decisions
 
     obs = ObserverSim(**curr_params)
@@ -98,6 +96,18 @@ def subject_likelihood(likelihood_arglist):
         curr_params['sigma'] = coarse_stats[i, :, 1]
         curr_params['N'] = curr_params['N_values'][i]
         N_blocked_model_params.append(curr_params)
+
+    pool = mulpro.Pool(processes=3)
+    dist_computed_params = pool.map(likelihood_inner_loop, N_blocked_model_params)
+    pool.close()
+    pool.join()
+
+    meanrho = np.mean((dist_computed_params[0]['rho'],
+                       dist_computed_params[1]['rho'],
+                       dist_computed_params[2]['rho']))
+
+    for curr_params in N_blocked_model_params:
+        curr_params['rho'] = meanrho
 
     pool = mulpro.Pool(processes=3)
     dist_computed_params = pool.map(likelihood_inner_loop, N_blocked_model_params)

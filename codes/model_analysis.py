@@ -110,6 +110,19 @@ class OptAnalysis:
         subject_data = DataLikelihoods(**self.model_params)
         sim_rt_means = np.zeros((len(self.model_params['N_values']), 2))
 
+        rhoarr = np.zeros(3)
+        for i in range(len(self.model_params['N_values'])):
+            curr_params = deepcopy(self.model_params)
+            N = curr_params['N_values'][i]
+            curr_params['mu'] = coarse_stats[i, :, 0]
+            curr_params['sigma'] = coarse_stats[i, :, 1]
+            curr_params['N'] = N
+
+            bellutil = BellmanUtil(**curr_params)
+            rhoarr[i] = bellutil.rho
+
+        meanrho = np.mean(bellutil.rho)
+
         fig, axes = plt.subplots(len(self.model_params['N_values']), 4, figsize=(22, 14))
         for i in range(len(self.model_params['N_values'])):
             curr_params = deepcopy(self.model_params)
@@ -117,6 +130,7 @@ class OptAnalysis:
             curr_params['mu'] = coarse_stats[i, :, 0]
             curr_params['sigma'] = coarse_stats[i, :, 1]
             curr_params['N'] = N
+            curr_params['rho'] = meanrho
 
             bellutil = BellmanUtil(**curr_params)
             curr_params['decisions'] = bellutil.decisions

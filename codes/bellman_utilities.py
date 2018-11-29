@@ -5,7 +5,7 @@ import numpy as np
 
 class BellmanUtil:
     def __init__(self, T, dt, t_w, t_delay, size, reward, punishment, sigma, mu,
-                 reward_scheme, **kwargs):
+                 reward_scheme, rho=None, **kwargs):
         """
         Solves for rho and performs backward induction through bellman eqs to find value over time
 
@@ -42,7 +42,12 @@ class BellmanUtil:
         self.g_values = np.linspace(1e-4, 1 - 1e-4, self.size)
 
         prob_grid = self.trans_probs(sigma, mu)
-        self.rho = self.solve_rho(reward, punishment, reward_scheme, sigma, mu, prob_grid)
+        if rho is not None and type(rho) in (float, np.float64):
+            self.rho = rho
+        elif rho is None:
+            self.rho = self.solve_rho(reward, punishment, reward_scheme, sigma, mu, prob_grid)
+        else:
+            raise TypeError('Rho must be a float or \'None\'')
 
         self.V_full, self.decisions = self.back_induct(reward, punishment, self.rho,
                                                        sigma, mu, prob_grid, reward_scheme)
