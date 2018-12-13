@@ -22,7 +22,7 @@ from data_and_likelihood import DataLikelihoods
 import pickle
 
 presamp = 20
-num_samples = 500
+num_samples = 700
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 gridsearch = False
@@ -196,7 +196,7 @@ def modelfit(arglist):
                                           bounds=bnds, n_pre_samples=presamp)
 
         elif model_type[0] == 'sig_reward_punish':
-            bnds = np.array(((-2.3, 0.2), (-0.7, 0.1), (-0.25, 2.3)))
+            bnds = np.array(((-2.3, 0.3), (-0.7, 0.2), (-0.25, 2.3)))
             x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                           bounds=bnds, n_pre_samples=presamp)
 
