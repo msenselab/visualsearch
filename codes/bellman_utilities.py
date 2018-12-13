@@ -1,11 +1,45 @@
 from scipy.optimize import brentq
 from scipy.stats import norm
 import numpy as np
+from numba import jit
+
+
+@jit(nopython=True)
+def induct_inner(T, dt, size, dg, rho, prob_grid, V_full, decision_vals, decisions, t_dependent):
+    for index in range(2, int(T / dt) + 1):
+        for i in range(size):
+            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * dt)
+
+            # Find the maximum value b/w waiting and two decision options. Store value and ident
+            V_full[i, -index] = np.amax(np.array((V_wait, decision_vals[i, 0],
+                                                  decision_vals[i, 1])))
+            decisions[i, -index] = np.argmax(np.array((V_wait, decision_vals[i, 0],
+                                                       decision_vals[i, 1])))
+        if not t_dependent and index > 20:
+            absolute_err = np.abs(V_full[:, -index] - V_full[:, -(index - 1)])
+            converged = np.all(absolute_err[5:-5] < 1e-5)
+            if converged:
+                dec_vec = decisions[:, -index]
+                # deal with degenerate cases in which there are no 1, 2s
+                dec_vec[0] = 1
+                dec_vec[-1] = 2
+                abs_threshold = np.amax(np.where(dec_vec == 1)[0])
+                pres_threshold = np.where(dec_vec == 2)[0][0]
+                dec_vec[0:abs_threshold] = 1
+                dec_vec[pres_threshold:len(dec_vec)] = 2
+                V_full_new = np.zeros((size, V_full.shape[1]))
+                for i in range(V_full.shape[1]):
+                    V_full_new[:, i] = V_full[:, -index]
+                decisions_new = np.zeros((size, decisions.shape[1]))
+                for i in range(decisions.shape[1]):
+                    decisions_new[:, i] = dec_vec
+                return V_full_new, decisions_new
+    return V_full, decisions
 
 
 class BellmanUtil:
     def __init__(self, T, dt, t_w, t_delay, size, reward, punishment, sigma, mu,
-                 reward_scheme, rho=None, **kwargs):
+                 reward_scheme, rho=None, use_jit=True, **kwargs):
         """
         Solves for rho and performs backward induction through bellman eqs to find value over time
 
@@ -34,6 +68,7 @@ class BellmanUtil:
                          above. 0 indicates wait, 1 indicates decide absent, 2 indicates decide pres
 
         """
+        self.use_jit = use_jit
         self.T = T
         self.t_w = t_w
         self.t_delay = t_delay
@@ -119,6 +154,11 @@ class BellmanUtil:
         # Corresponding array to store the identity of decisions made
         decisions = np.zeros((self.size, int(self.T / self.dt)))
         decisions[:, -1] = np.argmax(decision_vals, axis=1) + 1
+
+        if self.use_jit:
+            V_full, decisions = induct_inner(self.T, self.dt, self.size, dg, rho, prob_grid, V_full,
+                                             decision_vals, decisions, t_dependent)
+            return V_full, decisions
 
         # Backwards induction
         for index in range(2, int(self.T / self.dt) + 1):
