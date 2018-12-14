@@ -22,20 +22,23 @@ from data_and_likelihood import DataLikelihoods
 import pickle
 
 presamp = 20
-num_samples = 700
+num_samples = 400
 savepath = Path("~/Documents/")  # Where to save figures
 savepath = str(savepath.expanduser())
 gridsearch = False
 
 
 def likelihood_inner_loop(curr_params):
-    bellutil = BellmanUtil(**curr_params)
-    curr_params['rho'] = bellutil.rho
-    curr_params['decisions'] = bellutil.decisions
+    try:
+        bellutil = BellmanUtil(**curr_params)
+        curr_params['rho'] = bellutil.rho
+        curr_params['decisions'] = bellutil.decisions
 
-    obs = ObserverSim(**curr_params)
-    curr_params['fractions'] = obs.fractions
-    return curr_params
+        obs = ObserverSim(**curr_params)
+        curr_params['fractions'] = obs.fractions
+        return curr_params
+    except:
+        return 'failure'
 
 
 def subject_likelihood(likelihood_arglist):
@@ -79,12 +82,15 @@ def subject_likelihood(likelihood_arglist):
         fine_sigma = np.exp(log_parameters[0])
         reward = np.exp(log_parameters[1])
         punishment = np.exp(log_parameters[2])
+        alpha = np.exp(log_parameters[3])
         print('fine_sigma = {:.2f}'.format(fine_sigma), '| reward = {:.2f}'.format(reward),
-              '| punishment = {:.2f}'.format(punishment), '|| model_type = ', model_type)
+              '| punishment = {:.2f}'.format(punishment), '| alpha = {:.2f}'.format(alpha),
+              '|| model_type = ', model_type)
 
         model_params['fine_sigma'] = fine_sigma
         model_params['reward'] = reward
         model_params['punishment'] = -punishment
+        model_params['alpha'] = alpha
 
     finegr = FineGrained(**model_params)
     coarse_stats = finegr.coarse_stats
@@ -102,6 +108,10 @@ def subject_likelihood(likelihood_arglist):
     pool.close()
     pool.join()
 
+    if 'failure' in dist_computed_params:
+        print('something broke')
+        return 9999
+
     meanrho = np.mean((dist_computed_params[0]['rho'],
                        dist_computed_params[1]['rho'],
                        dist_computed_params[2]['rho']))
@@ -115,56 +125,12 @@ def subject_likelihood(likelihood_arglist):
     pool.join()
 
     if 'failure' in dist_computed_params:
+        print('something broke')
         return 9999
 
     likelihood_data = DataLikelihoods(**model_params)
     for single_N_params in dist_computed_params:
         likelihood_data.increment_likelihood(**single_N_params)
-
-    # T = model_params['T']
-    # dt = model_params['dt']
-    # N_values = model_params['N_values']
-    # g_values = model_params['g_values']
-    # fig, axes = plt.subplots(3, 2, sharex=True, figsize=(12, 8))
-    # t_values = np.arange(0, T, dt) + (dt / 2)
-    #
-    # Ncolors = ('purple', 'blue', 'green')
-    # for i, N in enumerate(N_values):
-    #     currfracs = dist_computed_params[i]['fractions']
-    #     currdecs = dist_computed_params[i]['decisions']
-    #     upperbounds = [np.where(currdecs[:, i] == 2)[0][0] for i in range(currdecs.shape[1])]
-    #     lowerbounds = [np.where(currdecs[:, i] == 1)[0][-1] + 1 for i in range(currdecs.shape[1])]
-    #     curr_abs_normed = currfracs[0][0, :] / np.sum(currfracs[0][0, :] * dt)
-    #     curr_abs_mean = np.sum(curr_abs_normed * t_values * dt)
-    #     curr_incorr_during_abs = np.sum(currfracs[0][1, :])
-    #     curr_pres_normed = currfracs[1][1, :] / np.sum(currfracs[1][1, :] * dt)
-    #     curr_pres_mean = np.sum(curr_pres_normed * t_values * dt)
-    #     curr_incorr_during_pres = np.sum(currfracs[1][0, :])
-    #     axes[i, 0].plot(t_values, curr_abs_normed, lw=2, color='purple', label='Correct Abs')
-    #     axes[i, 0].plot(t_values, curr_pres_normed, lw=2, color='orange', label='Correct pres')
-    #     axes[i, 0].set_title('N = {},Exception when C = 0, {:.2%} incorr, when C = 1, {:.2%} incorr'.format(
-    #         N, curr_incorr_during_abs, curr_incorr_during_pres))
-    #     axes[i, 0].vlines(curr_abs_mean, axes[i, 0].get_ylim()[0], axes[i, 0].get_ylim()[1],
-    #                       color='purple')
-    #     axes[i, 0].vlines(curr_pres_mean, axes[i, 0].get_ylim()[0], axes[i, 0].get_ylim()[1],
-    #                       color='orange')
-    #     axes[i, 0].set_xlim([0, 10])
-    #     axes[1, 1].plot(t_values, g_values[upperbounds], c=Ncolors[i], lw=1, label=str(N))
-    #     axes[1, 1].plot(t_values, g_values[lowerbounds], c=Ncolors[i], ls='--', lw=1)
-    #
-    # axes[1, 1].set_ylim([0, 1])
-    # axes[0, 1].remove()
-    # axes[2, 1].remove()
-    # datapath = Path('/home/berk/Documents/fit_data/')
-    # opt_type = model_params['opt_type']
-    # reward_scheme = model_params['reward_scheme']
-    # fine_model = model_params['fine_model']
-    # savepath = datapath.joinpath('./{}_{}_{}'.format(opt_type, reward_scheme, fine_model))
-    # plt.savefig(str(savepath) + '/subject_{}_tested_models/{:.2f}_{:.2f}_{:.2f}.png'.format(
-    #     model_params['subject_num'], model_params['fine_sigma'], model_params['reward'],
-    #     model_params['punishment']),
-    #     DPI=500)
-    # plt.close()
 
     return likelihood_data.likelihood
 
@@ -196,7 +162,7 @@ def modelfit(arglist):
                                           bounds=bnds, n_pre_samples=presamp)
 
         elif model_type[0] == 'sig_reward_punish':
-            bnds = np.array(((-2.3, 0.3), (-0.7, 0.2), (-0.25, 2.3)))
+            bnds = np.array(((-0.7, 0.3), (-0.7, 0.2), (-0.25, 2.3), (-1.4, 1.1)))
             x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                           bounds=bnds, n_pre_samples=presamp)
 
@@ -260,8 +226,8 @@ if __name__ == '__main__':
         subject_num = 1
         print('No subject number passed at prompt. Setting subject to 1')
 
-    size = 250
-    model_params = {'T': 40,
+    size = 600
+    model_params = {'T': 10,
                     'dt': 0.05,
                     't_w': 0.5,
                     't_delay': 0.2,

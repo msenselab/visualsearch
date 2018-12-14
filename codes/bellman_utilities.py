@@ -5,10 +5,12 @@ from numba import jit
 
 
 @jit(nopython=True)
-def induct_inner(T, dt, size, dg, rho, prob_grid, V_full, decision_vals, decisions, t_dependent):
+def induct_inner(T, dt, size, dg, rho, alpha, prob_grid, V_full, decision_vals, decisions,
+                 t_dependent):
     for index in range(2, int(T / dt) + 1):
+        t = T - index * dt
         for i in range(size):
-            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * dt)
+            V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * t ** alpha)
 
             # Find the maximum value b/w waiting and two decision options. Store value and ident
             V_full[i, -index] = np.amax(np.array((V_wait, decision_vals[i, 0],
@@ -38,7 +40,7 @@ def induct_inner(T, dt, size, dg, rho, prob_grid, V_full, decision_vals, decisio
 
 
 class BellmanUtil:
-    def __init__(self, T, dt, t_w, t_delay, size, reward, punishment, sigma, mu,
+    def __init__(self, T, dt, t_w, t_delay, size, reward, punishment, alpha, sigma, mu,
                  reward_scheme, rho=None, use_jit=True, **kwargs):
         """
         Solves for rho and performs backward induction through bellman eqs to find value over time
@@ -74,13 +76,15 @@ class BellmanUtil:
         self.t_delay = t_delay
         self.size = size
         self.dt = dt
+        self.alpha = alpha
         self.g_values = np.linspace(1e-4, 1 - 1e-4, self.size)
 
         prob_grid = self.trans_probs(sigma, mu)
         if rho is not None and type(rho) in (float, np.float64):
             self.rho = rho
         elif rho is None:
-            self.rho = self.solve_rho(reward, punishment, reward_scheme, sigma, mu, prob_grid)
+            self.rho = self.solve_rho(alpha, reward, punishment, reward_scheme, sigma, mu,
+                                      prob_grid)
         else:
             raise TypeError('Rho must be a float or \'None\'')
 
@@ -156,14 +160,17 @@ class BellmanUtil:
         decisions[:, -1] = np.argmax(decision_vals, axis=1) + 1
 
         if self.use_jit:
-            V_full, decisions = induct_inner(self.T, self.dt, self.size, dg, rho, prob_grid, V_full,
-                                             decision_vals, decisions, t_dependent)
+            V_full, decisions = induct_inner(self.T, self.dt, self.size, dg, rho, self.alpha,
+                                             prob_grid, V_full, decision_vals, decisions,
+                                             t_dependent)
             return V_full, decisions
 
         # Backwards induction
         for index in range(2, int(self.T / self.dt) + 1):
+            t = self.T - index * self.dt
             for i in range(self.size):
-                V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) * dg - (rho * self.dt)
+                V_wait = np.sum(prob_grid[:, i] * V_full[:, -(index - 1)]) * dg -\
+                    (rho * t ** self.alpha)
 
                 # Find the maximum value b/w waiting and two decision options. Store value and ident
                 V_full[i, -index] = np.amax((V_wait,
@@ -189,7 +196,7 @@ class BellmanUtil:
                     break
         return V_full, decisions
 
-    def solve_rho(self, reward, punishment, reward_scheme, sigma, mu, prob_grid):
+    def solve_rho(self, alpha, reward, punishment, reward_scheme, sigma, mu, prob_grid):
         '''
         Root finding procedure to find rho given the constrain V(t=0)=0.
         This criteria comes from the invariance of policy with

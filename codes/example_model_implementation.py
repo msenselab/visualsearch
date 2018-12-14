@@ -30,7 +30,7 @@ def run_model(model_params):
 if __name__ == '__main__':
     size = 250
     model_params = {'T': 10,
-                    'dt': 0.05,
+                    'dt': 0.01,
                     't_w': 0.5,
                     't_delay': 0.2,
                     't_max': 5.,
@@ -42,6 +42,7 @@ if __name__ == '__main__':
                     'fine_sigma': 0.83,
                     'reward': 0.60,
                     'punishment': -3.,
+                    'alpha': 1.,
                     'fine_model': 'const',
                     'reward_scheme': 'asym_reward',
                     }
