@@ -102,9 +102,10 @@ class OptAnalysis:
             self.model_params['fine_sigma'] = np.exp(optparams[0])
             self.model_params['reward'] = np.exp(optparams[1])
             self.model_params['punishment'] = - np.exp(optparams[2])
+            self.model_params['alpha'] = np.exp(optparams[3])
             optstring = r'$\sigma_{fine}$ =' + str(np.exp(optparams[0]))[:5] +\
                 ' reward =' + str(np.exp(optparams[1]))[:5] + ' punish =' +\
-                str(np.exp(optparams[2]))[:5]
+                str(np.exp(optparams[2]))[:5] + ' alpha =' + str(np.exp(optparams[3]))[:5]
         finegr = FineGrained(**self.model_params)
         coarse_stats = finegr.coarse_stats
         subject_data = DataLikelihoods(**self.model_params)
