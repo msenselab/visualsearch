@@ -129,7 +129,10 @@ def subject_likelihood(likelihood_arglist):
     for single_N_params in dist_computed_params:
         likelihood_data.increment_likelihood(**single_N_params)
 
-    return likelihood_data.likelihood
+    if likelihood_data.likelihood == np.nan:
+        return 9999
+    else:
+        return likelihood_data.likelihood
 
 
 def modelfit(arglist):

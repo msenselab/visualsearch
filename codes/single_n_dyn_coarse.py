@@ -52,7 +52,10 @@ def subject_likelihood(likelihood_arglist):
     likelihood_data = DataLikelihoods(**model_params)
     likelihood_data.increment_likelihood(**model_params)
     print(likelihood_data.likelihood)
-    return likelihood_data.likelihood
+    if likelihood_data.likelihood == np.nan:
+        return 9999
+    else:
+        return likelihood_data.likelihood
 
 
 def modelfit(model_params):
