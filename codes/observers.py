@@ -116,8 +116,15 @@ class ObserverSim:
             currstep = np.zeros(g_values.shape[0])
             for j, g_t in enumerate(g_values):
                 currstep = currstep + prob_grid[j, :] * observerarr[j, i-1]
-            lowerbound = np.amax(np.where(self.decisions[:, i] == 1)[0]) + 1
-            upperbound = np.where(self.decisions[:, i] == 2)[0][0]
+            if 1 in self.decisions[:, i]:
+                lowerbound = np.amax(np.where(self.decisions[:, i] == 1)[0]) + 1
+            else:
+                lowerbound = 0
+
+            if 2 in self.decisions[:, i]:
+                upperbound = np.where(self.decisions[:, i] == 2)[0][0]
+            else:
+                upperbound = g_values.shape[0] + 1
             observerarr[lowerbound:upperbound, i] = currstep[lowerbound:upperbound]
             fractions[2, i] = np.sum(currstep[lowerbound:upperbound])
             fractions[0, i] = np.sum(currstep[:lowerbound])

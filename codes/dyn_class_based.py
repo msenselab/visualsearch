@@ -29,16 +29,13 @@ gridsearch = False
 
 
 def likelihood_inner_loop(curr_params):
-    try:
-        bellutil = BellmanUtil(**curr_params)
-        curr_params['rho'] = bellutil.rho
-        curr_params['decisions'] = bellutil.decisions
+    bellutil = BellmanUtil(**curr_params)
+    curr_params['rho'] = bellutil.rho
+    curr_params['decisions'] = bellutil.decisions
 
-        obs = ObserverSim(**curr_params)
-        curr_params['fractions'] = obs.fractions
-        return curr_params
-    except:
-        return 'failure'
+    obs = ObserverSim(**curr_params)
+    curr_params['fractions'] = obs.fractions
+    return curr_params
 
 
 def subject_likelihood(likelihood_arglist):
