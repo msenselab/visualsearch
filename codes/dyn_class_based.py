@@ -126,9 +126,12 @@ def subject_likelihood(likelihood_arglist):
         return 9999
 
     likelihood_data = DataLikelihoods(**model_params)
-    for single_N_params in dist_computed_params:
-        likelihood_data.increment_likelihood(**single_N_params)
-
+    try:
+        for single_N_params in dist_computed_params:
+            likelihood_data.increment_likelihood(**single_N_params)
+    except ValueError:
+        print('likelihood interp failure')
+        return 9999
     if likelihood_data.likelihood == np.nan:
         return 9999
     else:

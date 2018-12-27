@@ -50,7 +50,11 @@ def subject_likelihood(likelihood_arglist):
     model_params['fractions'] = obs.fractions
 
     likelihood_data = DataLikelihoods(**model_params)
-    likelihood_data.increment_likelihood(**model_params)
+    try:
+        likelihood_data.increment_likelihood(**model_params)
+    except ValueError:
+        print('likelihood interp failure')
+        return 9999
     print(likelihood_data.likelihood)
     if likelihood_data.likelihood == np.nan:
         return 9999
