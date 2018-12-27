@@ -48,7 +48,7 @@ class DataLikelihoods:
         temp = np.mean(np.array(N_data['rt']))
         t_values = np.arange(0, t_max, dt)
         d_eval = 1e-4
-        fudge_factor = 1e-5
+        fudge_factor = 2.5e-5
         max_ind = np.round(t_max / dt).astype(int)
         evalpoints = np.arange(0, t_values[-1], d_eval)
         normfactors = np.zeros((2, 2))
