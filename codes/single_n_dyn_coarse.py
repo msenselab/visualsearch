@@ -56,7 +56,7 @@ def subject_likelihood(likelihood_arglist):
         print('likelihood interp failure')
         return 9999
     print(likelihood_data.likelihood)
-    if likelihood_data.likelihood == np.nan:
+    if np.isnan(likelihood_data.likelihood):
         return 9999
     else:
         return likelihood_data.likelihood
