@@ -34,8 +34,8 @@ def subject_likelihood(likelihood_arglist):
     reward = np.exp(log_parameters[2])
     punishment = np.exp(log_parameters[3])
     alpha = np.exp(log_parameters[4])
-    print('sigmas = {:.2f}, {:.2f}'.format(*sigma), '| reward = {:.2f}'.format(reward),
-          '| punishment = {:.2f}'.format(punishment), '| alpha = {:.2f}'.format(alpha))
+    print('sigmas = {:.2f}, {:.2f}'.format(*sigma), '; reward = {:.2f}'.format(reward),
+          '; punishment = {:.2f}'.format(punishment), '; alpha = {:.2f}'.format(alpha))
 
     model_params['sigma'] = sigma
     model_params['reward'] = reward
@@ -52,6 +52,9 @@ def subject_likelihood(likelihood_arglist):
     likelihood_data = DataLikelihoods(**model_params)
     likelihood_data.increment_likelihood(**model_params)
     print(likelihood_data.likelihood)
+    if np.isnan(likelihood_data.likelihood):
+        return np.inf
+
     return likelihood_data.likelihood
 
 
