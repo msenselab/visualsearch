@@ -48,7 +48,6 @@ class DataLikelihoods:
         temp = np.mean(np.array(N_data['rt']))
         t_values = np.arange(0, t_max, dt)
         d_eval = 1e-4
-        fudge_factor = 1e-5
         max_ind = np.round(t_max / dt).astype(int)
         evalpoints = np.arange(0, t_values[-1], d_eval)
         normfactors = np.zeros((2, 2))
@@ -76,11 +75,8 @@ class DataLikelihoods:
             for c in (0, 1):
                 for r in (0, 1):
                     subj_rt_likelihoods[c, r] = (likelihood_funcs[c, r](subj_rts[c, r]) /
-                                                 normfactors[c, r]) + fudge_factor
+                                                 normfactors[c, r])
 
-            fractions = list(fractions)
-            fractions[0] = fractions[0] + fudge_factor
-            fractions[1] = fractions[1] + fudge_factor
             log_like_abs = np.concatenate((np.log(np.sum(fractions[0][0, :max_ind])) +
                                            np.log(subj_rt_likelihoods[0, 0]),
                                            np.log(np.sum(fractions[0][1, :max_ind])) +

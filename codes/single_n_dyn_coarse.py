@@ -53,8 +53,7 @@ def subject_likelihood(likelihood_arglist):
     likelihood_data.increment_likelihood(**model_params)
     print(likelihood_data.likelihood)
     if np.isnan(likelihood_data.likelihood):
-        return np.inf
-
+        return 999
     return likelihood_data.likelihood
 
 
