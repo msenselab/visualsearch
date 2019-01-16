@@ -48,7 +48,7 @@ class DataLikelihoods:
         temp = np.mean(np.array(N_data['rt']))
         t_values = np.arange(0, t_max, dt)
         d_eval = 1e-4
-        fudge_factor = 2.5e-5
+        fudge_factor = 1e-10
         max_ind = np.round(t_max / dt).astype(int)
         evalpoints = np.arange(0, t_values[-1], d_eval)
         normfactors = np.zeros((2, 2))
@@ -58,7 +58,7 @@ class DataLikelihoods:
                 curr_fracs = fractions[condition][response, :max_ind]
                 curr_func = interp1d(t_values, curr_fracs)
                 likelihood_funcs[condition, response] = curr_func
-                normfactors[condition, response] = np.sum(curr_func(evalpoints)) * d_eval
+                normfactors[condition, response] = np.sum(curr_func(evalpoints)) * d_eval + fudge_factor
 
         subj_rts = np.zeros((2, 3), dtype=object)
         subj_rts[0, 0] = N_data.query('resp == 2 & target == \'Absent\'').rt.values
@@ -76,7 +76,7 @@ class DataLikelihoods:
             for c in (0, 1):
                 for r in (0, 1):
                     subj_rt_likelihoods[c, r] = (likelihood_funcs[c, r](subj_rts[c, r]) /
-                                                 normfactors[c, r]) + fudge_factor
+                                                 normfactors[c, r])
 
             fractions = list(fractions)
             fractions[0] = fractions[0] + fudge_factor

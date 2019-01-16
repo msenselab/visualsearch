@@ -11,11 +11,12 @@ from pathlib import Path
 from gauss_opt import bayesian_optimisation
 from bellman_utilities import BellmanUtil
 from observers import ObserverSim
+from copy import deepcopy
 from data_and_likelihood import DataLikelihoods
 import pickle
 
 presamp = 20
-num_samples = 400
+num_samples = 980
 savepath = Path("~/Documents/fit_data/")  # Where to save figures
 savepath = str(savepath.expanduser())
 N_index = 1
@@ -29,6 +30,7 @@ def subject_likelihood(likelihood_arglist):
     and print what is being evaluated by the optimization algorithm."""
     log_parameters, model_params = likelihood_arglist
 
+    curr_params = deepcopy(model_params)
     # fine_sigma and punishment are fit, reward fixed at 1
     sigma = np.array((np.exp(log_parameters[0]), np.exp(log_parameters[1])))
     reward = np.exp(log_parameters[2])
@@ -37,23 +39,21 @@ def subject_likelihood(likelihood_arglist):
     print('sigmas = {:.2f}, {:.2f}'.format(*sigma), '; reward = {:.2f}'.format(reward),
           '; punishment = {:.2f}'.format(punishment), '; alpha = {:.2f}'.format(alpha))
 
-    model_params['sigma'] = sigma
-    model_params['reward'] = reward
-    model_params['punishment'] = -punishment
-    model_params['alpha'] = alpha
+    curr_params['sigma'] = sigma
+    curr_params['reward'] = reward
+    curr_params['punishment'] = -punishment
+    curr_params['alpha'] = alpha
 
-    bellutil = BellmanUtil(**model_params)
-    model_params['rho'] = bellutil.rho
-    model_params['decisions'] = bellutil.decisions
+    bellutil = BellmanUtil(**curr_params)
+    curr_params['rho'] = bellutil.rho
+    curr_params['decisions'] = bellutil.decisions
 
-    obs = ObserverSim(**model_params)
-    model_params['fractions'] = obs.fractions
+    obs = ObserverSim(**curr_params)
+    curr_params['fractions'] = obs.fractions
 
-    likelihood_data = DataLikelihoods(**model_params)
-    likelihood_data.increment_likelihood(**model_params)
+    likelihood_data = DataLikelihoods(**curr_params)
+    likelihood_data.increment_likelihood(**curr_params)
     print(likelihood_data.likelihood)
-    if np.isnan(likelihood_data.likelihood):
-        return 999
     return likelihood_data.likelihood
 
 
@@ -63,10 +63,10 @@ def modelfit(model_params):
         return subject_likelihood(likelihood_arglist)
 
     bounds = np.array(((0.5, 2.),
-                       (0.5, 2.),
-                       (0.5, 1.1),
-                       (0.7, 8.),
-                       (0.25, 6.)))
+                       (2., 7.),
+                       (0.4, 1.),
+                       (2.5, 20.),
+                       (0.8, 9.)))
     log_bounds = np.log(bounds)
     x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                   bounds=log_bounds, n_pre_samples=presamp)
