@@ -19,8 +19,6 @@ presamp = 20
 num_samples = 980
 savepath = Path("~/Documents/fit_data/")  # Where to save figures
 savepath = str(savepath.expanduser())
-N_index = 1
-N_value = 12
 
 
 def subject_likelihood(likelihood_arglist):
@@ -81,12 +79,15 @@ def modelfit(model_params):
 if __name__ == '__main__':
     try:
         subject_num = sys.argv[1]
+        N_value = sys.argv[2]
         if not subject_num.isnumeric():
             subject_num = 1
             print('Invalid subject number passed at prompt. Setting subject to 1')
+        if not N_value.isnumeric():
+            N_value = 12
+            print('Invalid N value passed at prompt. Setting N to 12')
     except IndexError:
-        subject_num = 1
-        print('No subject number passed at prompt. Setting subject to 1')
+        raise RuntimeError('Need to specify both sub num and N')
 
     size = 600
     model_params = {'T': 10,
