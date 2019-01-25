@@ -32,7 +32,9 @@ model_params = {'T': 10,
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': subject_num,
                 'reward_scheme': 'asym_reward'}
-
+dt = model_params['dt']
+T = model_params['T']
+t_delay = model_params['t_delay']
 t_values = np.arange(0, model_params['T'], model_params['dt'])
 
 testdata = np.load('/home/berk/Documents/fit_data/single_N/subject_{}_single_N_12_modelfit.p'.format(subject_num))
@@ -58,8 +60,10 @@ curr_params['decisions'] = bellutil.decisions
 
 obs = ObserverSim(**curr_params)
 curr_params['fractions'] = obs.fractions
-presmean = np.sum(obs.fractions[1][1, :] * t_values) / np.sum(obs.fractions[1][1, :])
-absmean = np.sum(obs.fractions[0][0, :] * t_values) / np.sum(obs.fractions[0][0, :])
+presmean = np.sum(obs.fractions[1][1, :] * t_values) / np.sum(obs.fractions[1][1, :]) + t_delay
+incpresmean = np.sum(obs.fractions[0][1, :] * t_values) / np.sum(obs.fractions[0][1, :]) + t_delay
+absmean = np.sum(obs.fractions[0][0, :] * t_values) / np.sum(obs.fractions[0][0, :]) + t_delay
+incabsmean = np.sum(obs.fractions[1][0, :] * t_values) / np.sum(obs.fractions[1][0, :]) + t_delay
 
 
 likelihood_data = DataLikelihoods(**curr_params)
@@ -78,8 +82,10 @@ subj_rts[1, 1] = N_data.query('resp == 1 & target == \'Present\'').rt.values
 subpresmean = np.mean(subj_rts[1, 1])
 pres_timeouts = len(N_data.query('resp == -1 & target == \'Present\'').rt.values)
 pres_timeouts = np.array([pres_timeouts])
-plt.fill_between(t_values + 0.2, obs.fractions[0][0, :] / np.sum(obs.fractions[0][0, :]) / dt, color='purple', alpha=0.5)
-plt.fill_between(t_values + 0.2, obs.fractions[1][1, :] / np.sum(obs.fractions[1][1, :]) / dt, color='orange', alpha=0.5)
+plt.fill_between(t_values + 0.2, obs.fractions[0][0, :] / np.sum(obs.fractions[0][0, :]) / dt,
+                 color='purple', alpha=0.5)
+plt.fill_between(t_values + 0.2, obs.fractions[1][1, :] / np.sum(obs.fractions[1][1, :]) / dt,
+                 color='orange', alpha=0.5)
 sns.kdeplot(subj_rts[0, 0], bw=0.1, alpha=0.5, shade=True, color='blue')
 sns.kdeplot(subj_rts[1, 1], bw=0.1, alpha=0.5, shade=True, color='red')
 ax = plt.gca()
@@ -92,11 +98,13 @@ plt.vlines(np.mean(subj_rts[1, 1]), ymin, ymax, color='red', lw=2)
 plt.xlabel('RT (s)', size=18)
 ax.set_xlim([0, 6])
 ax.set_ylim([ymin, ymax])
-plt.title('Optimal fit Sub {}\n'.format(subject_num) + 'sig_abs = {:.2f}, sig_pres = {:.2f}, reward = {:.2f}\n punishment = {:.2f}, alpha = {:.2f}'.format(*np.exp(log_parameters)) , size=18)
+plt.title('Optimal fit Sub {}\n'.format(subject_num) +
+          'sig_abs = {:.2f}, sig_pres = {:.2f}, reward = {:.2f}\n punishment = {:.2f}, alpha = {:.2f}'.format(*np.exp(log_parameters)) , size=18)
 plt.tight_layout()
 plt.savefig('/home/berk/Documents/single_N_subject_{}_N_12_1000_iter_optfit.png'.format(subject_num), DPI=500)
 
-meanrho = presmean * np.sum(obs.fractions[1][1, :]) * 1 +\
-          np.sum(obs.fractions[1][0, :] * t_values) * punishment +\
-          absmean * np.sum(obs.fractions[0][0, :]) * reward +\
-          np.sum(obs.fractions[0][1, :] * t_values) * punishment
+meanrho = 1 / presmean * np.sum(obs.fractions[1][1, :]) * 0.5 +\
+          (-punishment / incpresmean) * np.sum(obs.fractions[0][1, :]) * 0.5 +\
+          reward / absmean * np.sum(obs.fractions[0][0, :]) * 0.5 +\
+          (-punishment / incabsmean) * np.sum(obs.fractions[1][0, :]) * 0.5
+print(meanrho)

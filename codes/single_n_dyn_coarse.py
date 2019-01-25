@@ -62,11 +62,11 @@ def modelfit(model_params):
         likelihood_arglist = log_parameters, model_params
         return subject_likelihood(likelihood_arglist)
 
-    bounds = np.array(((0.5, 2.),
-                       (2., 7.),
-                       (0.4, 1.),
+    bounds = np.array(((0.5, 2.5),
+                       (1.5, 3.5),
+                       (0.4, 1.1),
                        (2.5, 20.),
-                       (0.8, 9.)))
+                       (0.8, 4.5)))
     log_bounds = np.log(bounds)
     x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                   bounds=log_bounds, n_pre_samples=presamp)
