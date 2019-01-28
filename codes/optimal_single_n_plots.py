@@ -1,6 +1,8 @@
 import numpy as np
 import sys
 from pathlib import Path
+import matplotlib.pyplot as plt
+import seaborn as sns
 from gauss_opt import bayesian_optimisation
 from bellman_utilities import BellmanUtil
 from observers import ObserverSim
@@ -11,6 +13,7 @@ import pickle
 presamp = 20
 num_samples = 980
 savepath = Path("~/Documents/fit_data/")  # Where to save figures
+loadpath = Path("~/Documents/fit_data/single_N/")
 savepath = str(savepath.expanduser())
 N_index = 0
 N_value = 8
@@ -35,10 +38,13 @@ model_params = {'T': 10,
 dt = model_params['dt']
 T = model_params['T']
 t_delay = model_params['t_delay']
+t_max = model_params['t_max']
+maxind = int(t_max / dt) - 1
 t_values = np.arange(0, model_params['T'], model_params['dt'])
 
-testdata = np.load('/home/berk/Documents/fit_data/single_N/subject_{}_single_N_12_modelfit.p'.format(subject_num))
-np.amin(testdata['likelihoods_returned'])
+testdata = np.load('/home/berk/Documents/fit_data/single_N/subject_{}_single_N_{}_modelfit.p'.format(subject_num, N_value))
+print('fit returned min of', np.amin(testdata['likelihoods_returned']))
+numiters = len(testdata['likelihoods_returned'])
 log_parameters = testdata['tested_params'][np.argmin(testdata['likelihoods_returned'])]
 curr_params = deepcopy(model_params)
 # fine_sigma and punishment are fit, reward fixed at 1
@@ -60,10 +66,10 @@ curr_params['decisions'] = bellutil.decisions
 
 obs = ObserverSim(**curr_params)
 curr_params['fractions'] = obs.fractions
-presmean = np.sum(obs.fractions[1][1, :] * t_values) / np.sum(obs.fractions[1][1, :]) + t_delay
-incpresmean = np.sum(obs.fractions[0][1, :] * t_values) / np.sum(obs.fractions[0][1, :]) + t_delay
-absmean = np.sum(obs.fractions[0][0, :] * t_values) / np.sum(obs.fractions[0][0, :]) + t_delay
-incabsmean = np.sum(obs.fractions[1][0, :] * t_values) / np.sum(obs.fractions[1][0, :]) + t_delay
+presmean = np.sum(obs.fractions[1][1, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[1][1, :maxind]) + t_delay
+incpresmean = np.sum(obs.fractions[0][1, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[0][1, :maxind]) + t_delay
+absmean = np.sum(obs.fractions[0][0, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[0][0, :maxind]) + t_delay
+incabsmean = np.sum(obs.fractions[1][0, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[1][0, :maxind]) + t_delay
 
 
 likelihood_data = DataLikelihoods(**curr_params)
@@ -75,36 +81,59 @@ subj_rts[0, 0] = N_data.query('resp == 2 & target == \'Absent\'').rt.values
 subj_rts[0, 1] = N_data.query('resp == 1 & target == \'Absent\'').rt.values
 subabsmean = np.mean(subj_rts[0, 0])
 abs_timeouts = len(N_data.query('resp == -1 & target == \'Absent\'').rt.values)
-abs_timeouts = np.array([abs_timeouts])
+tot_abs = len(subj_rts[0, 0]) + len(subj_rts[0, 1]) + abs_timeouts
 
 subj_rts[1, 0] = N_data.query('resp == 2 & target == \'Present\'').rt.values
 subj_rts[1, 1] = N_data.query('resp == 1 & target == \'Present\'').rt.values
 subpresmean = np.mean(subj_rts[1, 1])
 pres_timeouts = len(N_data.query('resp == -1 & target == \'Present\'').rt.values)
-pres_timeouts = np.array([pres_timeouts])
-plt.fill_between(t_values + 0.2, obs.fractions[0][0, :] / np.sum(obs.fractions[0][0, :]) / dt,
-                 color='purple', alpha=0.5)
-plt.fill_between(t_values + 0.2, obs.fractions[1][1, :] / np.sum(obs.fractions[1][1, :]) / dt,
-                 color='orange', alpha=0.5)
-sns.kdeplot(subj_rts[0, 0], bw=0.1, alpha=0.5, shade=True, color='blue')
-sns.kdeplot(subj_rts[1, 1], bw=0.1, alpha=0.5, shade=True, color='red')
-ax = plt.gca()
-ymin, ymax = ax.get_ylim()
-plt.vlines(presmean, ymin, ymax, colors='orange', lw=2)
-plt.vlines(absmean, ymin, ymax, colors='purple', lw=2)
-plt.vlines(np.mean(subj_rts[0, 0]), ymin, ymax, color='blue', lw=2)
-plt.vlines(np.mean(subj_rts[1, 1]), ymin, ymax, color='red', lw=2)
+tot_pres = len(subj_rts[1, 1]) + len(subj_rts[1, 0]) + pres_timeouts
+grandtotal = tot_pres + tot_abs
 
-plt.xlabel('RT (s)', size=18)
-ax.set_xlim([0, 6])
-ax.set_ylim([ymin, ymax])
-plt.title('Optimal fit Sub {}\n'.format(subject_num) +
-          'sig_abs = {:.2f}, sig_pres = {:.2f}, reward = {:.2f}\n punishment = {:.2f}, alpha = {:.2f}'.format(*np.exp(log_parameters)) , size=18)
+fig, ax = plt.subplots(1, 2, figsize=(16, 6))
+ax[0].fill_between(t_values[:maxind] + 0.2, obs.fractions[0][0, :maxind] / np.sum(obs.fractions[0][0, :maxind]) / dt,
+                 color='purple', alpha=0.5)
+ax[0].fill_between(t_values[:maxind] + 0.2, obs.fractions[1][1, :maxind] / np.sum(obs.fractions[1][1, :maxind]) / dt,
+                 color='orange', alpha=0.5)
+sns.kdeplot(subj_rts[0, 0], bw=0.1, alpha=0.5, shade=True, color='blue', ax=ax[0])
+sns.kdeplot(subj_rts[1, 1], bw=0.1, alpha=0.5, shade=True, color='red', ax=ax[0])
+
+ymin, ymax = ax[0].get_ylim()
+ax[0].vlines(presmean, ymin, ymax, colors='orange', lw=2)
+ax[0].vlines(absmean, ymin, ymax, colors='purple', lw=2)
+ax[0].vlines(np.mean(subj_rts[0, 0]), ymin, ymax, color='blue', lw=2)
+ax[0].vlines(np.mean(subj_rts[1, 1]), ymin, ymax, color='red', lw=2)
+
+ax[0].set_xlabel('RT (s)', size=18)
+ax[0].set_xlim([0, 6])
+ax[0].set_ylim([ymin, ymax])
+ax[0].set_title('Optimal fit Sub {} Correct\n'.format(subject_num) +
+                'sig_abs = {:.2f}, sig_pres = {:.2f}, reward = {:.2f}\n'.format(*np.exp(log_parameters[:3])) +
+                'punishment = {:.2f}, alpha = {:.2f}'.format(*np.exp(log_parameters[3:])), size=18)
+
+ax[1].fill_between(t_values[:maxind] + 0.2, obs.fractions[0][1, :maxind] / np.sum(obs.fractions[0][1, :maxind]) / dt,
+                 color='purple', alpha=0.5, label=r'Sim $\hat{C} = 1 | C = 0$')
+ax[1].fill_between(t_values[:maxind] + 0.2, obs.fractions[1][1, :maxind] / np.sum(obs.fractions[1][0, :maxind]) / dt,
+                 color='orange', alpha=0.5, label=r'Sim $\hat{C} = 0 | C = 1$')
+sns.kdeplot(subj_rts[0, 1], bw=0.1, alpha=0.5, shade=True, color='blue', ax=ax[1],
+            label=r'Subj $\hat{C} = 1 | C = 0$')
+sns.kdeplot(subj_rts[1, 0], bw=0.1, alpha=0.5, shade=True, color='red', ax=ax[1],
+            label=r'Subj $\hat{C} = 0 | C = 1$')
+ax[1].set_title('Optimal fit sub {} Incorrect\n'.format(subject_num) +
+                'Resp pres | abs: Subj {:.2%} Sim {:.2%}\n'.format(len(subj_rts[0, 1]) / tot_abs,
+                                                                   np.sum(obs.fractions[0][1, :maxind])) +
+                'Resp abs | pres: Subj {:.2%} Sim {:.2%}\n'.format(len(subj_rts[1, 0]) / tot_pres,
+                                                                   np.sum(obs.fractions[1][0, :maxind])) +
+                'Timeout: Subj {:.2%} Sim {:.2%}'.format((abs_timeouts + pres_timeouts) / grandtotal,
+                                                         obs.fractions[0][2, maxind] * 0.5 + obs.fractions[1][2, maxind] * 0.5),
+                size=18)
+
 plt.tight_layout()
-plt.savefig('/home/berk/Documents/single_N_subject_{}_N_12_1000_iter_optfit.png'.format(subject_num), DPI=500)
+plt.savefig('/home/berk/Documents/single_N_subject_{}_N_{}_1000_iter_optfit.png'.format(subject_num, N_value), DPI=500)
 
 meanrho = 1 / presmean * np.sum(obs.fractions[1][1, :]) * 0.5 +\
           (-punishment / incpresmean) * np.sum(obs.fractions[0][1, :]) * 0.5 +\
           reward / absmean * np.sum(obs.fractions[0][0, :]) * 0.5 +\
           (-punishment / incabsmean) * np.sum(obs.fractions[1][0, :]) * 0.5
 print(meanrho)
+print(curr_params['rho'])

@@ -63,7 +63,7 @@ def modelfit(model_params):
     bounds = np.array(((0.5, 2.5),
                        (1.5, 3.5),
                        (0.4, 1.1),
-                       (2.5, 20.),
+                       (0.5, 8.),
                        (0.8, 4.5)))
     log_bounds = np.log(bounds)
     x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
