@@ -5,7 +5,7 @@ from scipy.interpolate import interp1d
 
 
 class DataLikelihoods:
-    def __init__(self, subject_num, **kwargs):
+    def __init__(self, subject_num, experiment, **kwargs):
         """
         Class to load in subject data and then compute likelihood of data given simulation
 
@@ -19,7 +19,7 @@ class DataLikelihoods:
             self.increment_likelihood for each N and associated sim data dists and RTs.
 
         """
-        datapath = Path('../data/exp1.csv')
+        datapath = Path('../data/{}.csv'.format(experiment))
         exp1 = pd.read_csv(datapath, index_col=None)
         exp1.rename(columns={'sub': 'subno'}, inplace=True)
 

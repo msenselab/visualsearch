@@ -15,11 +15,9 @@ num_samples = 980
 savepath = Path("~/Documents/fit_data/")  # Where to save figures
 loadpath = Path("~/Documents/fit_data/single_N/")
 savepath = str(savepath.expanduser())
-N_index = 0
 N_value = 8
-
-
-subject_num = 4
+subject_num = 1
+experiment = 'exp1'
 
 size = 600
 model_params = {'T': 10,
@@ -34,7 +32,8 @@ model_params = {'T': 10,
                 'N_values': (8, 12, 16),
                 'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                 'subject_num': subject_num,
-                'reward_scheme': 'asym_reward'}
+                'reward_scheme': 'asym_reward',
+                'experiment': experiment}
 dt = model_params['dt']
 T = model_params['T']
 t_delay = model_params['t_delay']
@@ -42,7 +41,8 @@ t_max = model_params['t_max']
 maxind = int(t_max / dt) - 1
 t_values = np.arange(0, model_params['T'], model_params['dt'])
 
-testdata = np.load('/home/berk/Documents/fit_data/single_N/subject_{}_single_N_{}_modelfit.p'.format(subject_num, N_value))
+filename = '/home/berk/Documents/fit_data/single_N/subject_{}_single_N_{}_modelfit.p'.format(subject_num, N_value)
+testdata = np.load(filename)
 print('fit returned min of', np.amin(testdata['likelihoods_returned']))
 numiters = len(testdata['likelihoods_returned'])
 log_parameters = testdata['tested_params'][np.argmin(testdata['likelihoods_returned'])]
@@ -70,12 +70,15 @@ presmean = np.sum(obs.fractions[1][1, :maxind] * (t_values[:maxind] + t_delay)) 
 incpresmean = np.sum(obs.fractions[0][1, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[0][1, :maxind]) + t_delay
 absmean = np.sum(obs.fractions[0][0, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[0][0, :maxind]) + t_delay
 incabsmean = np.sum(obs.fractions[1][0, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[1][0, :maxind]) + t_delay
-
+testdata['meanresps'] = np.array([[absmean, incabsmean], [incpresmean, presmean]])
+fw = open(filename, 'wb')
+pickle.dump(testdata, fw)
+fw.close()
 
 likelihood_data = DataLikelihoods(**curr_params)
 likelihood_data.increment_likelihood(**curr_params)
 print(likelihood_data.likelihood)
-N_data = likelihood_data.sub_data.query('setsize == 12')
+N_data = likelihood_data.sub_data.query('setsize == {}'.format(N_value))
 subj_rts = np.zeros((2, 3), dtype=object)
 subj_rts[0, 0] = N_data.query('resp == 2 & target == \'Absent\'').rt.values
 subj_rts[0, 1] = N_data.query('resp == 1 & target == \'Absent\'').rt.values
@@ -113,7 +116,7 @@ ax[0].set_title('Optimal fit Sub {} Correct\n'.format(subject_num) +
 
 ax[1].fill_between(t_values[:maxind] + 0.2, obs.fractions[0][1, :maxind] / np.sum(obs.fractions[0][1, :maxind]) / dt,
                  color='purple', alpha=0.5, label=r'Sim $\hat{C} = 1 | C = 0$')
-ax[1].fill_between(t_values[:maxind] + 0.2, obs.fractions[1][1, :maxind] / np.sum(obs.fractions[1][0, :maxind]) / dt,
+ax[1].fill_between(t_values[:maxind] + 0.2, obs.fractions[1][0, :maxind] / np.sum(obs.fractions[1][0, :maxind]) / dt,
                  color='orange', alpha=0.5, label=r'Sim $\hat{C} = 0 | C = 1$')
 sns.kdeplot(subj_rts[0, 1], bw=0.1, alpha=0.5, shade=True, color='blue', ax=ax[1],
             label=r'Subj $\hat{C} = 1 | C = 0$')

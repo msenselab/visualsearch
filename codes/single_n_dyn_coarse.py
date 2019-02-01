@@ -62,9 +62,9 @@ def modelfit(model_params):
 
     bounds = np.array(((0.5, 2.5),
                        (1.5, 3.5),
-                       (0.4, 1.1),
+                       (0.7, 2.5),
                        (0.5, 8.),
-                       (0.8, 4.5)))
+                       (0.8, 9.5)))
     log_bounds = np.log(bounds)
     x_opt = bayesian_optimisation(n_iters=num_samples, sample_loss=likelihood_for_opt,
                                   bounds=log_bounds, n_pre_samples=presamp)
@@ -80,6 +80,7 @@ if __name__ == '__main__':
     try:
         subject_num = sys.argv[1]
         N_value = sys.argv[2]
+        experiment = sys.argv[3]
         if not subject_num.isnumeric():
             subject_num = 1
             print('Invalid subject number passed at prompt. Setting subject to 1')
@@ -102,7 +103,8 @@ if __name__ == '__main__':
                     'N_values': (8, 12, 16),
                     'g_values': np.linspace(1e-4, 1 - 1e-4, size),
                     'subject_num': subject_num,
-                    'reward_scheme': 'asym_reward'}
+                    'reward_scheme': 'asym_reward',
+                    'experiment': experiment}
 
     print('Subject number {}'.format(subject_num))
     modelfit(model_params)
