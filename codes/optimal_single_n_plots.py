@@ -71,9 +71,7 @@ incpresmean = np.sum(obs.fractions[0][1, :maxind] * (t_values[:maxind] + t_delay
 absmean = np.sum(obs.fractions[0][0, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[0][0, :maxind]) + t_delay
 incabsmean = np.sum(obs.fractions[1][0, :maxind] * (t_values[:maxind] + t_delay)) / np.sum(obs.fractions[1][0, :maxind]) + t_delay
 testdata['meanresps'] = np.array([[absmean, incabsmean], [incpresmean, presmean]])
-fw = open(filename, 'wb')
-pickle.dump(testdata, fw)
-fw.close()
+
 
 likelihood_data = DataLikelihoods(**curr_params)
 likelihood_data.increment_likelihood(**curr_params)
