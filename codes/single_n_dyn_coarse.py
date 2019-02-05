@@ -16,7 +16,7 @@ from data_and_likelihood import DataLikelihoods
 import pickle
 
 presamp = 20
-num_samples = 980
+num_samples = 680
 savepath = Path("~/Documents/fit_data/")  # Where to save figures
 savepath = str(savepath.expanduser())
 
@@ -70,7 +70,8 @@ def modelfit(model_params):
                                   bounds=log_bounds, n_pre_samples=presamp)
 
     model_params['tested_params'], model_params['likelihoods_returned'] = x_opt
-    fw = open(savepath + '/subject_{}_single_N_{}_modelfit.p'.format(subject_num, N_value), 'wb')
+    fw = open(savepath + '/subject_{}_{}_single_N_{}_modelfit.p'.format(subject_num, experiment,
+                                                                        N_value), 'wb')
     pickle.dump(model_params, fw)
     fw.close()
     return
