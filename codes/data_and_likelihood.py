@@ -19,11 +19,21 @@ class DataLikelihoods:
             self.increment_likelihood for each N and associated sim data dists and RTs.
 
         """
+        if experiment == 'exp2abs':
+            experiment = 'exp2'
+            rewardcond = 'Absent'
+        elif experiment == 'exp2pres':
+            experiment = 'exp2'
+            rewardcond = 'Present'
         datapath = Path('../data/{}.csv'.format(experiment))
-        exp1 = pd.read_csv(datapath, index_col=None)
-        exp1.rename(columns={'sub': 'subno'}, inplace=True)
+        exp = pd.read_csv(datapath, index_col=None)
+        exp.rename(columns={'sub': 'subno'}, inplace=True)
 
-        self.sub_data = exp1.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
+        if rewardcond:
+            self.sub_data = exp.query('subno == {} & dyn == \'Dynamic\' & reward == \'{}\''
+                                      .format(subject_num, rewardcond))
+        else:
+            self.sub_data = exp.query('subno == {} & dyn == \'Dynamic\''.format(subject_num))
         self.likelihood = 0.
 
     def increment_likelihood(self, fractions, T, t_max, dt, t_delay, N, reward, lapse, **kwargs):
@@ -58,7 +68,8 @@ class DataLikelihoods:
                 curr_fracs = fractions[condition][response, :max_ind]
                 curr_func = interp1d(t_values, curr_fracs)
                 likelihood_funcs[condition, response] = curr_func
-                normfactors[condition, response] = np.sum(curr_func(evalpoints)) * d_eval + fudge_factor
+                normfactors[condition, response] = np.sum(curr_func(evalpoints)) * d_eval\
+                    + fudge_factor
 
         subj_rts = np.zeros((2, 3), dtype=object)
         subj_rts[0, 0] = N_data.query('resp == 2 & target == \'Absent\'').rt.values

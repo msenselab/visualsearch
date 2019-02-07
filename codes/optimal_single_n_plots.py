@@ -52,6 +52,7 @@ sigma = np.array((np.exp(log_parameters[0]), np.exp(log_parameters[1])))
 reward = np.exp(log_parameters[2])
 punishment = np.exp(log_parameters[3])
 alpha = np.exp(log_parameters[4])
+finalparams = np.array([*sigma, reward, punishment, alpha])
 print('sigmas = {:.2f}, {:.2f}'.format(*sigma), '; reward = {:.2f}'.format(reward),
       '; punishment = {:.2f}'.format(punishment), '; alpha = {:.2f}'.format(alpha))
 
@@ -109,8 +110,8 @@ ax[0].set_xlabel('RT (s)', size=18)
 ax[0].set_xlim([0, 6])
 ax[0].set_ylim([ymin, ymax])
 ax[0].set_title('Optimal fit Sub {} Correct\n'.format(subject_num) +
-                'sig_abs = {:.2f}, sig_pres = {:.2f}, reward = {:.2f}\n'.format(*np.exp(log_parameters[:3])) +
-                'punishment = {:.2f}, alpha = {:.2f}'.format(*np.exp(log_parameters[3:])), size=18)
+                'sig_abs = {:.2f}, sig_pres = {:.2f}, reward = {:.2f}\n'.format(*finalparams[:3]) +
+                'punishment = {:.2f}, alpha = {:.2f}'.format(*finalparams[3:]), size=18)
 
 ax[1].fill_between(t_values[:maxind] + 0.2, obs.fractions[0][1, :maxind] / np.sum(obs.fractions[0][1, :maxind]) / dt,
                  color='purple', alpha=0.5, label=r'Sim $\hat{C} = 1 | C = 0$')
