@@ -25,6 +25,8 @@ class DataLikelihoods:
         elif experiment == 'exp2pres':
             experiment = 'exp2'
             rewardcond = 'Present'
+        else:
+            rewardcond = None
         datapath = Path('../data/{}.csv'.format(experiment))
         exp = pd.read_csv(datapath, index_col=None)
         exp.rename(columns={'sub': 'subno'}, inplace=True)
