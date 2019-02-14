@@ -100,3 +100,19 @@ for i, rewardfactor in enumerate(manip_vals):
 
 exp1 = pd.read_csv('../data/exp1.csv')
 exp2 = pd.read_csv('../data/exp2.csv')
+
+exp1 = exp1[(exp1['dyn'] == 'Dynamic') & (exp1['sub'] != 666) & (exp1['setsize'] == 12)]
+exp2 = exp2[(exp2['dyn'] == 'Dynamic') & (exp2['sub'] != 666) & (exp2['setsize'] == 12)]
+exp1['reward'] = 'None'
+newdf = exp1.append(exp1, sort=False)
+
+g = sns.catplot(x='reward', y='rt', hue='target', data=newdf, kind='point',
+                order=['Absent', 'None', 'Present'])
+g.set_xticklabels(size=18)
+g.set_yticklabels(size=18)
+g.set_ylabels('RT (s)', size=20)
+g.set_xlabels('Reward Condition', size=20)
+
+ax = plt.gca()
+ax.plot([0, 1, 2], sim_mrts[::-1, 1, 1, 1], label='Sim Present', c='lightgreen', lw=2)
+ax.plot([0, 1, 2], sim_mrts[::-1, 1, 0, 0], label='Sim Absent', c='purple', lw=2)

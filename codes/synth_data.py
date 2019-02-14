@@ -16,8 +16,8 @@ class DataGen:
         condN = tot_samples // 2
         dt = model_params['dt']
         T = model_params['T']
-        t_delay = model_params['t_delay']
-        t_max = model_params['t_max'] - t_delay
+        t_d = model_params['t_delay']
+        t_max = model_params['t_max'] - t_d
         maxind = int(t_max / dt) - 1
         t_values = np.arange(0, T, dt)
         g_values = model_params['g_values']
@@ -46,15 +46,15 @@ class DataGen:
                 while i <= maxind:
                     currdec = decisions[binned_traces[C, sample, i], i]
                     if currdec == 1:
-                        response_times[C, sample] = t_values[i] + t_delay
+                        response_times[C, sample] = t_values[i] + t_d
                         response_idents[C, sample] = 0
                         break
                     elif currdec == 2:
-                        response_times[C, sample] = t_values[i] + t_delay
+                        response_times[C, sample] = t_values[i] + t_d
                         response_idents[C, sample] = 1
                         break
                     elif (currdec == 0) and (i == maxind):
-                        response_times[C, sample] = t_max + t_delay
+                        response_times[C, sample] = t_max + t_d
                         response_idents[C, sample] = 2
                     i += 1
 
