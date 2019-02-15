@@ -13,6 +13,16 @@ class DataGen:
         curr_params['decisions'] = bellutil.decisions
         decisions = bellutil.decisions
 
+        for i, column in enumerate(decisions.T):
+            try:
+                upperbound = (column == 2).nonzero()[0][0]
+                lowerbound = (column == 1).nonzero()[0][-1]
+            except IndexError:
+                raise(ValueError, 'Non-existant bounds at some timestep')
+            column[upperbound:] = 2
+            column[:lowerbound] = 1
+            decisions[:, i] = column
+
         condN = tot_samples // 2
         dt = model_params['dt']
         T = model_params['T']
